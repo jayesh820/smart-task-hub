@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Advanced WhatsApp Message Sender</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet" />
+  <style>
+    body {
+      background: linear-gradient(135deg, #25d366 14%, #075e54 100%);
+      min-height: 100vh;
+      font-family: 'Segoe UI', 'Roboto', Arial, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .container {
+      background: white;
+      border-radius: 20px;
+      box-shadow: 0 16px 48px #0003;
+      padding: 30px 28px;
+      width: 100%;
+      max-width: 460px;
+      text-align: center;
+    }
+    h2 {
+      margin: 0 0 16px;
+      color: #075e54;
+      font-weight: 900;
+      letter-spacing: 0.04em;
+    }
+    .field {
+      margin-bottom: 20px;
+      text-align: left;
+    }
+    label {
+      font-size: 1.05em;
+      color: #222;
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 600;
+    }
+    input[type="text"],
+    input[type="tel"],
+    textarea,
+    select {
+      width: 100%;
+      border: 1.5px solid #eee;
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-size: 1.07em;
+      font-family: inherit;
+      background: #f6f8fc;
+      resize: vertical;
+      transition: border-color 0.25s ease;
+    }
+    input[type="text"]:focus,
+    input[type="tel"]:focus,
+    textarea:focus,
+    select:focus {
+      outline: none;
+      border-color: #128c7e;
+      box-shadow: 0 0 6px #128c7eaa;
+    }
+    textarea {
+      min-height: 90px;
+    }
+    .btn {
+      padding: 14px 24px;
+      border: none;
+      border-radius: 28px;
+      font-size: 1.15em;
+      font-weight: 700;
+      cursor: pointer;
+      background: linear-gradient(45deg, #25d366, #128c7e);
+      color: white;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 6px 20px #128c7e88;
+      transition: transform 0.15s, box-shadow 0.15s;
+      user-select: none;
+    }
+    .btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 28px #128c7ecc;
+    }
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+    .btn.copy {
+      background: #0a8fea;
+      box-shadow: 0 6px 16px #0a8fea88;
+    }
+    .btn.copy:hover:not(:disabled) {
+      box-shadow: 0 10px 20px #0a8feacb;
+    }
+    .field.small {
+      margin-top: 8px;
+      font-size: 0.9em;
+      color: #555;
+    }
+    .status {
+      margin: 16px 0 0;
+      padding: 12px 16px;
+      border-radius: 12px;
+      font-weight: 700;
+      display: none;
+      user-select: none;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .info { background: #d1ecf1; color: #0c5460; }
+    .ok { background: #d4edda; color: #155724; }
+    .err { background: #f8d7da; color: #721c24; }
+    select {
+      cursor: pointer;
+    }
+    @media (max-width: 480px) {
+      .container {
+        padding: 24px 14px;
+        max-width: 100%;
+      }
+      .btn {
+        width: 100%;
+        justify-content: center;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container" role="main" aria-label="WhatsApp Message Sender">
+    <h2><i class="fab fa-whatsapp"></i> WhatsApp Message Sender</h2>
+
+    <form id="waForm" autocomplete="off" aria-live="polite">
+      <div class="field">
+        <label for="phones">Phone Number(s) <span class="field small">(With country code, separate multiple by comma)</span></label>
+        <input type="text" id="phones" name="phones" placeholder="+919876543210, 919812345678" aria-describedby="phonesHelp" required />
+        <div id="phonesHelp" class="field small">Example: +919876543210, 919812345678</div>
+      </div>
+
+      <div class="field">
+        <label for="msg">Message</label>
+        <textarea id="msg" name="msg" placeholder="Type your WhatsApp message here..." required></textarea>
+      </div>
+
+      <div class="field">
+        <label for="schedule">Schedule Send (seconds delay)</label>
+        <input type="number" id="schedule" name="schedule" min="0" max="3600" placeholder="0 (send immediately)" />
+      </div>
+
+      <div class="field">
+        <label for="sendUrl">WhatsApp URL Scheme</label>
+        <select id="sendUrl" name="sendUrl" aria-label="WhatsApp URL scheme choice">
+          <option value="wa.me">https://wa.me/</option>
+          <option value="api.whatsapp.com">https://api.whatsapp.com/send?phone=</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="templateSelect">Message Template (optional)</label>
+        <select id="templateSelect" name="templateSelect" aria-label="Select a message template">
+          <option value="">-- Choose a template --</option>
+          <option value="Hello! How are you?">Hello! How are you?</option>
+          <option value="This is an automated message.">This is an automated message.</option>
+          <option value="Please contact me at your earliest convenience.">Please contact me at your earliest convenience.</option>
+        </select>
+      </div>
+
+      <div style="display:flex; gap: 12px; flex-wrap: wrap; justify-content: center;">
+        <button type="submit" class="btn" id="sendBtn"><i class="fab fa-whatsapp"></i> Send WhatsApp Message</button>
+        <button type="button" class="btn copy" id="copyLinkBtn" disabled><i class="fas fa-link"></i> Copy WhatsApp Link</button>
+      </div>
+    </form>
+
+    <div id="status" class="status info" role="alert"></div>
+  </div>
+
+  <script>
+    (function(){
+      const form = document.getElementById('waForm');
+      const phonesInput = document.getElementById('phones');
+      const msgInput = document.getElementById('msg');
+      const scheduleInput = document.getElementById('schedule');
+      const sendUrlSelect = document.getElementById('sendUrl');
+      const templateSelect = document.getElementById('templateSelect');
+      const sendBtn = document.getElementById('sendBtn');
+      const copyBtn = document.getElementById('copyLinkBtn');
+      const statusEl = document.getElementById('status');
+      let lastGeneratedLinks = [];
+
+      function showStatus(msg, type='info') {
+        statusEl.textContent = msg;
+        statusEl.className = 'status ' + type;
+        statusEl.style.display = 'block';
+      }
+      function hideStatus() {
+        statusEl.style.display = 'none';
+      }
+
+      function cleanPhone(raw) {
+        // Remove invalid characters, keep only digits (no plus sign)
+        return raw.replace(/[^0-9]/g,"");
+      }
+
+      function validatePhones(raw) {
+        if (!raw) return [];
+        // Split by comma, trim, clean each
+        return raw.split(',')
+          .map(p => p.trim())
+          .filter(Boolean)
+          .map(cleanPhone)
+          .filter(p => p.length >= 10 && p.length <= 15);
+      }
+
+      function generateWhatsAppLink(phone, text) {
+        const baseUrl = sendUrlSelect.value === 'wa.me' 
+          ? 'https://wa.me/'
+          : 'https://api.whatsapp.com/send?phone=';
+        const encodedText = encodeURIComponent(text);
+        return baseUrl + phone + '?text=' + encodedText;
+      }
+
+      function generateMultipleLinks(phones, text) {
+        return phones.map(phone => generateWhatsAppLink(phone, text));
+      }
+
+      function openLinksSequentially(links, delaySec=0) {
+        if (links.length === 0) return;
+        let index = 0;
+
+        function openNext() {
+          if (index >= links.length) return;
+          window.open(links[index], '_blank', 'noopener');
+          index++;
+          if (index < links.length) {
+            setTimeout(openNext, delaySec * 1000);
+          }
+        }
+        openNext();
+      }
+
+      function copyToClipboard(text) {
+        if (navigator.clipboard && window.isSecureContext) {
+          return navigator.clipboard.writeText(text);
+        } else {
+          // Fallback
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          ta.style.position = 'fixed';
+          ta.style.top = 0;
+          ta.style.left =0;
+          ta.style.width = '2em';
+          ta.style.height = '2em';
+          ta.style.padding = 0;
+          ta.style.border = 'none';
+          ta.style.outline = 'none';
+          ta.style.boxShadow = 'none';
+          ta.style.background = 'transparent';
+          document.body.appendChild(ta);
+          ta.select();
+          try {
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            return Promise.resolve();
+          } catch(e) {
+            document.body.removeChild(ta);
+            return Promise.reject();
+          }
+        }
+      }
+
+      // Fill message from template
+      templateSelect.addEventListener('change', () => {
+        if(templateSelect.value){
+          msgInput.value = templateSelect.value;
+          hideStatus();
+        }
+      });
+
+      form.addEventListener('submit', async (ev) => {
+        ev.preventDefault();
+        hideStatus();
+        copyBtn.disabled = true;
+
+        const rawPhones = phonesInput.value.trim();
+        const message = msgInput.value.trim() || 'Hello!';
+        const delaySec = parseInt(scheduleInput.value, 10) || 0;
+
+        const phones = validatePhones(rawPhones);
+        if (phones.length === 0) {
+          showStatus('Please enter at least one valid phone number (with country code).', 'err');
+          phonesInput.focus();
+          return;
+        }
+        if (!message) {
+          showStatus('Message cannot be empty.', 'err');
+          msgInput.focus();
+          return;
+        }
+
+        sendBtn.disabled = true;
+        showStatus('Preparing to open WhatsApp...', 'info');
+
+        try {
+          lastGeneratedLinks = generateMultipleLinks(phones, message);
+
+          if (delaySec > 0) {
+            showStatus(`Sending message to ${phones.length} number(s) starting in ${delaySec} seconds...`, 'info');
+            setTimeout(() => {
+              openLinksSequentially(lastGeneratedLinks, 1.2 /* 1.2s delay between tabs to avoid pop-up blocking */);
+            }, delaySec * 1000);
+          } else {
+            openLinksSequentially(lastGeneratedLinks, 1.2);
+          }
+
+          showStatus(`Opened WhatsApp with message for ${phones.length} number(s).`, 'ok');
+          copyBtn.disabled = false;
+        } catch (err) {
+          showStatus('Failed to open WhatsApp: ' + err.message, 'err');
+        } finally {
+          sendBtn.disabled = false;
+        }
+      });
+
+      copyBtn.addEventListener('click', async () => {
+        if (!lastGeneratedLinks.length) return;
+        const text = lastGeneratedLinks.join('\n');
+        try {
+          await copyToClipboard(text);
+          showStatus('WhatsApp link(s) copied to clipboard!', 'ok');
+        } catch {
+          showStatus('Failed to copy to clipboard.', 'err');
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
