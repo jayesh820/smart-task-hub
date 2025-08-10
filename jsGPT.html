@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>ChatGPT Web Client – Plus</title>
+<style>
+  :root {
+    --bg: #0b1020;
+    --panel: #121932;
+    --muted: #9aa4c7;
+    --text: #e8ecff;
+    --accent: #5b8cff;
+    --accent-2: #8a7dff;
+    --danger: #ff6b6b;
+    --warn: #f59e0b;
+    --good: #10b981;
+    --bubble-user: #1f2a4d;
+    --bubble-assistant: #10182f;
+    --border: #223056;
+    --shadow: 0 10px 30px rgba(0,0,0,.35);
+  }
+  .light {
+    --bg: #f6f7fb;
+    --panel: #ffffff;
+    --muted: #5b6a89;
+    --text: #0f172a;
+    --accent: #3b82f6;
+    --accent-2: #7c3aed;
+    --danger: #e11d48;
+    --warn: #b45309;
+    --good: #059669;
+    --bubble-user: #e9f0ff;
+    --bubble-assistant: #f3f5fb;
+    --border: #e5e7ef;
+    --shadow: 0 10px 30px rgba(16,24,40,.08);
+  }
+  html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, -apple-system, Segoe UI, Roboto, Inter, "Helvetica Neue", Arial; }
+  * { box-sizing: border-box; }
+  .app { display: grid; grid-template-rows: auto 1fr auto; height: 100%; max-width: 1200px; margin: 0 auto; }
+  header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent-2)); box-shadow: 0 0 14px rgba(91,140,255,.6); }
+  h1 { font-size: 16px; margin: 0; letter-spacing: .2px; }
+  .toolbar { display: flex; gap: 8px; align-items: center; }
+  .btn, button, select, input, textarea {
+    border: 1px solid var(--border); background: var(--panel); color: var(--text);
+    border-radius: 10px; padding: 8px 12px; transition: .15s ease; box-shadow: var(--shadow);
+  }
+  .btn:hover { transform: translateY(-1px); }
+  .btn.primary { background: linear-gradient(135deg, var(--accent), var(--accent-2)); border: none; color: #fff; }
+  .btn.ghost { background: transparent; border-color: var(--border); box-shadow: none; }
+  .btn.warn { background: var(--warn); color: #fff; border: none; }
+  .btn.good { background: var(--good); color: #fff; border: none; }
+  .btn.danger { background: var(--danger); color: #fff; border: none; }
+  .container { display: grid; grid-template-columns: 280px 1fr; gap: 14px; padding: 0 16px 16px; }
+  @media (max-width: 980px) { .container { grid-template-columns: 1fr; } aside { order: 2; } }
+  aside, main { border: 1px solid var(--border); background: var(--panel); border-radius: 14px; box-shadow: var(--shadow); }
+  aside { padding: 12px; height: fit-content; }
+  .pill { font-size: 12px; padding: 4px 8px; border-radius: 999px; color: var(--muted); border: 1px solid var(--border); display: inline-block; }
+  .list { margin-top: 8px; display: grid; gap: 6px; max-height: 40vh; overflow: auto; }
+  .conv { display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: center; padding: 8px; border: 1px solid var(--border); border-radius: 10px; cursor: pointer; }
+  .conv.active { outline: 2px solid var(--accent); }
+  .conv .name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .spacer { flex: 1; }
+  main { display: flex; flex-direction: column; overflow: hidden; min-height: 60vh; }
+  .chat { padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
+  .bubble { display: grid; grid-template-columns: 36px 1fr; gap: 10px; align-items: start; }
+  .avatar { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-weight: 700; }
+  .avatar.user { background: linear-gradient(135deg, #59d, #7af); }
+  .avatar.ai { background: linear-gradient(135deg, #8a7dff, #5b8cff); }
+  .msg { border: 1px solid var(--border); padding: 10px 12px; border-radius: 12px; white-space: pre-wrap; word-wrap: break-word; background: var(--bubble-assistant); }
+  .user .msg { background: var(--bubble-user); }
+  .meta { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .msg-tools { display: flex; gap: 6px; margin-top: 6px; }
+  .composer { border-top: 1px solid var(--border); padding: 12px; display: grid; gap: 8px; background: linear-gradient(180deg, rgba(255,255,255,.02), transparent); }
+  textarea { flex: 1; resize: none; min-height: 42px; max-height: 180px; line-height: 1.35; padding: 10px 12px; overflow: auto; outline: none; }
+  .hint { color: var(--muted); font-size: 12px; }
+  .kbd { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; background: rgba(255,255,255,.06); border: 1px solid var(--border); padding: 2px 6px; border-radius: 6px; }
+  .footer { padding: 10px 16px; color: var(--muted); font-size: 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .hidden { display: none !important; }
+  .token { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; padding: 2px 6px; border-radius: 6px; border: 1px solid var(--border); color: var(--muted); }
+  .img-thumb { max-width: 160px; max-height: 120px; border-radius: 8px; border: 1px solid var(--border); margin-top: 6px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <div class="dot"></div>
+      <h1>ChatGPT Web Client – Plus</h1>
+    </div>
+    <div class="toolbar">
+      <button class="btn ghost" id="themeBtn">Auto</button>
+      <button class="btn ghost" id="newChatBtn">New Chat</button>
+      <button class="btn ghost" id="exportBtn">Export</button>
+      <label class="btn ghost" for="importFile">Import<input id="importFile" type="file" accept="application/json" hidden></label>
+      <button class="btn ghost" id="clearAllBtn">Clear All</button>
+    </div>
+  </header>
+
+  <div class="container">
+    <aside>
+      <div class="pill">Conversations</div>
+      <div class="list" id="convList"></div>
+
+      <div class="pill" style="margin-top:10px">Settings</div>
+      <div class="row" style="margin-top:6px">
+        <select id="modelSel" style="flex:1">
+          <option value="gpt-4o" selected>gpt-4o (chat)</option>
+          <option value="gpt-4o-mini">gpt-4o-mini (cheaper)</option>
+          <option value="gpt-4.1">gpt-4.1 (responses)</option>
+        </select>
+        <select id="endpointSel">
+          <option value="chat" selected>Chat Completions</option>
+          <option value="responses">Responses API</option>
+        </select>
+      </div>
+      <div class="row" style="margin-top:6px">
+        <input id="apiKey" placeholder="API Key (demo only)" style="flex:1" />
+      </div>
+      <div class="row" style="margin-top:6px">
+        <select id="presetSel" style="flex:1">
+          <option value="">No preset</option>
+          <option value="helpful">Helpful, concise assistant</option>
+          <option value="coder">Senior JS developer</option>
+          <option value="translator">Professional translator</option>
+        </select>
+      </div>
+      <div class="hint" style="margin-top:6px">
+        For production, leave API key empty and call your backend proxy at /api/chat.
+      </div>
+    </aside>
+
+    <main>
+      <div id="chat" class="chat"></div>
+
+      <div class="composer">
+        <input id="systemPrompt" placeholder="Optional system prompt" />
+        <div class="row">
+          <textarea id="input" placeholder="Type a message. Enter to send, Shift+Enter for newline"></textarea>
+          <div class="row" style="flex-direction: column; gap: 6px;">
+            <label class="btn ghost" for="imgFile">+ Image<input id="imgFile" type="file" accept="image/*" hidden></label>
+            <button id="sendBtn" class="btn primary">Send</button>
+            <button id="stopBtn" class="btn warn">Stop</button>
+          </div>
+        </div>
+        <div class="row">
+          <div class="hint">Shortcuts: Enter to send, Shift+Enter for newline, Esc to stop.</div>
+          <span class="spacer"></span>
+          <span class="token" id="tokenInfo">~0 tokens | $0.0000</span>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div class="footer">
+    Tips: Click a message to edit and resend. Use the ⋯ tools to copy or delete. Regenerate the last response via the ⋯ on the last assistant message.
+  </div>
+</div>
+
+<script>
+(() => {
+  // State
+  let controller = null;
+  let conversations = load('conversations') || {};
+  let currentId = load('currentId') || createConversation('New chat');
+  let autoTheme = true;
+
+  // DOM
+  const chatEl = $('#chat');
+  const inputEl = $('#input');
+  const sendBtn = $('#sendBtn');
+  const stopBtn = $('#stopBtn');
+  const modelSel = $('#modelSel');
+  const endpointSel = $('#endpointSel');
+  const apiKeyEl = $('#apiKey');
+  const systemEl = $('#systemPrompt');
+  const themeBtn = $('#themeBtn');
+  const newChatBtn = $('#newChatBtn');
+  const convList = $('#convList');
+  const tokenInfo = $('#tokenInfo');
+  const exportBtn = $('#exportBtn');
+  const importFile = $('#importFile');
+  const clearAllBtn = $('#clearAllBtn');
+  const imgFile = $('#imgFile');
+  const presetSel = $('#presetSel');
+
+  // Init
+  applyTheme();
+  renderConversations();
+  renderChat();
+
+  // Presets
+  presetSel.addEventListener('change', () => {
+    switch (presetSel.value) {
+      case 'helpful':
+        systemEl.value = 'You are a helpful, concise assistant. Prefer short, actionable answers unless asked for detail.';
+        break;
+      case 'coder':
+        systemEl.value = 'You are a senior JavaScript developer. Provide robust, secure, production-ready examples. Use clear comments.';
+        break;
+      case 'translator':
+        systemEl.value = 'You are a professional translator. Translate preserving tone and formatting. Provide only the translation unless asked.';
+        break;
+      default:
+        // no preset
+        break;
+    }
+  });
+
+  // Theme
+  themeBtn.addEventListener('click', () => {
+    if (autoTheme) {
+      autoTheme = false;
+      document.body.classList.toggle('light', false);
+      themeBtn.textContent = 'Dark';
+    } else {
+      if (document.body.classList.contains('light')) {
+        document.body.classList.remove('light');
+        themeBtn.textContent = 'Light';
+      } else {
+        document.body.classList.add('light');
+        themeBtn.textContent = 'Auto';
+        autoTheme = true;
+        applyTheme();
+      }
+    }
+  });
+  window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', applyTheme);
+  function applyTheme() {
+    if (!autoTheme) return;
+    const prefersLight = window.matchMedia('(prefers-color-scheme: light)').matches;
+    document.body.classList.toggle('light', prefersLight);
+    themeBtn.textContent = 'Auto';
+  }
+
+  // Utility helpers
+  function $(q){ return document.querySelector(q); }
+  function el(tag, className, text) {
+    const x = document.createElement(tag);
+    if (className) x.className = className;
+    if (text !== undefined) x.textContent = text;
+    return x;
+  }
+  function save(k,v){ localStorage.setItem(k, JSON.stringify(v)); }
+  function load(k){ try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }
+  function ts(){ return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
+  function uid(){ return Math.random().toString(36).slice(2,10); }
+  function copy(text){ navigator.clipboard?.writeText(text).catch(()=>{}); }
+
+  function createConversation(name) {
+    const id = uid();
+    conversations[id] = { id, name, messages: [], created: Date.now(), updated: Date.now() };
+    currentId = id;
+    persist();
+    return id;
+  }
+  function renameConversation(id, name) {
+    conversations[id].name = name || 'Untitled';
+    conversations[id].updated = Date.now();
+    persist();
+    renderConversations();
+  }
+  function deleteConversation(id) {
+    delete conversations[id];
+    if (!Object.keys(conversations).length) createConversation('New chat');
+    currentId = Object.keys(conversations)[0];
+    persist();
+    renderConversations();
+    renderChat();
+  }
+  function persist() { save('conversations', conversations); save('currentId', currentId); }
+
+  // Conversation UI
+  function renderConversations() {
+    convList.innerHTML = '';
+    const entries = Object.values(conversations).sort((a,b)=>b.updated-a.updated);
+    for (const c of entries) {
+      const item = el('div','conv'+(c.id===currentId?' active':''));
+      const name = el('div','name', c.name);
+      const tools = el('div','row');
+      const renameBtn = el('button','btn ghost','✎');
+      const delBtn = el('button','btn danger','🗑');
+      renameBtn.title = 'Rename';
+      delBtn.title = 'Delete';
+      tools.append(renameBtn, delBtn);
+      item.append(name, tools);
+      convList.append(item);
+
+      item.addEventListener('click', (e) => {
+        if (e.target === renameBtn || e.target === delBtn) return;
+        currentId = c.id; persist(); renderConversations(); renderChat();
+      });
+      renameBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const newName = prompt('Conversation name:', c.name);
+        if (newName !== null) renameConversation(c.id, newName.trim());
+      });
+      delBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (confirm('Delete this conversation?')) deleteConversation(c.id);
+      });
+    }
+  }
+
+  function currentConv() { return conversations[currentId]; }
+
+  // Message UI
+  function renderChat() {
+    const conv = currentConv();
+    chatEl.innerHTML = '';
+    if (!conv) return;
+    for (const m of conv.messages) {
+      addBubble(m.role, m.content, m.timestamp, m.images);
+    }
+    chatEl.scrollTop = chatEl.scrollHeight;
+    estimateTokensAndCost();
+  }
+
+  function addBubble(role, content, time, images) {
+    const w = el('div', `bubble ${role}`);
+    const avatar = el('div', `avatar ${role === 'assistant' ? 'ai' : 'user'}`);
+    avatar.textContent = role === 'assistant' ? 'AI' : 'U';
+
+    const msgWrap = el('div');
+    const box = el('div', 'msg');
+    box.textContent = content || '';
+    if (images && images.length) {
+      for (const src of images) {
+        const img = el('img','img-thumb');
+        img.src = src;
+        box.appendChild(img);
+      }
+    }
+
+    const meta = el('div','meta', `${role} • ${time || ts()}`);
+    const tools = el('div','msg-tools');
+    const copyBtn = el('button','btn ghost','⧉ Copy');
+    const editBtn = el('button','btn ghost','✎ Edit');
+    const delBtn = el('button','btn ghost','🗑 Delete');
+    tools.append(copyBtn, editBtn, delBtn);
+
+    // For last assistant message: regenerate button
+    if (role === 'assistant') {
+      const regenBtn = el('button','btn ghost','↻ Regenerate');
+      tools.append(regenBtn);
+      regenBtn.addEventListener('click', () => regenerateLast());
+    }
+
+    w.append(avatar, msgWrap);
+    msgWrap.append(box, tools, meta);
+    chatEl.appendChild(w);
+
+    // Actions
+    copyBtn.addEventListener('click', ()=> copy(content || ''));
+    editBtn.addEventListener('click', () => {
+      inputEl.value = content || '';
+      inputEl.focus();
+    });
+    delBtn.addEventListener('click', () => {
+      const conv = currentConv();
+      const idx = conv.messages.findIndex(m => m.timestamp === time && m.content === content);
+      if (idx > -1) {
+        conv.messages.splice(idx, 1);
+        conv.updated = Date.now();
+        persist();
+        renderChat();
+      }
+    });
+    return box;
+  }
+
+  // Export/Import
+  exportBtn.addEventListener('click', () => {
+    const data = { version: 1, conversations };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'chats.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+  importFile.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      if (data.conversations) {
+        conversations = data.conversations;
+        currentId = Object.keys(conversations)[0];
+        persist();
+        renderConversations();
+        renderChat();
+      } else {
+        alert('Invalid file format');
+      }
+    } catch (err) {
+      alert('Failed to import: ' + (err.message || 'unknown'));
+    } finally {
+      importFile.value = '';
+    }
+  });
+  clearAllBtn.addEventListener('click', () => {
+    if (!confirm('Clear all conversations?')) return;
+    conversations = {};
+    currentId = createConversation('New chat');
+    renderConversations();
+    renderChat();
+  });
+
+  // New chat
+  newChatBtn.addEventListener('click', () => {
+    const id = createConversation('New chat');
+    currentId = id;
+    renderConversations();
+    renderChat();
+  });
+
+  // Stop streaming
+  function stopStream() { controller?.abort(); controller = null; }
+  stopBtn.addEventListener('click', stopStream);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') stopStream(); });
+
+  // Input handling
+  inputEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+  });
+  inputEl.addEventListener('input', autoResize);
+  function autoResize() {
+    inputEl.style.height = 'auto';
+    inputEl.style.height = Math.min(inputEl.scrollHeight, 180) + 'px';
+    estimateTokensAndCost();
+  }
+
+  // Image upload
+  let pendingImages = [];
+  imgFile.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const b64 = await toBase64(file);
+    pendingImages.push(b64);
+    // show thumb in composer by temporarily adding preview below input
+    const img = document.createElement('img');
+    img.src = b64;
+    img.className = 'img-thumb';
+    inputEl.parentElement.appendChild(img);
+  });
+  function toBase64(file) {
+    return new Promise((res, rej) => {
+      const reader = new FileReader();
+      reader.onload = () => res(reader.result);
+      reader.onerror = rej;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // Regenerate last assistant reply
+  function regenerateLast() {
+    const conv = currentConv();
+    if (!conv.messages.length) return;
+    // Remove trailing assistant message if last; else noop
+    if (conv.messages[conv.messages.length - 1].role === 'assistant') {
+      conv.messages.pop();
+      persist();
+      renderChat();
+      send(true);
+    }
+  }
+
+  // Token and cost estimation (very rough heuristic)
+  function estimateTokensAndCost() {
+    const conv = currentConv();
+    const text = (systemEl.value + ' ' + (conv?.messages?.map(m => m.content).join(' ') || '') + ' ' + inputEl.value).trim();
+    const approxTokens = Math.ceil(text.length / 4); // naive 1 token ~ 4 chars
+    const model = modelSel.value;
+    // Example rough price mapping (adjust to your pricing)
+    const price = {
+      'gpt-4o': { in: 0.005, out: 0.015 },
+      'gpt-4o-mini': { in: 0.0005, out: 0.0015 },
+      'gpt-4.1': { in: 0.005, out: 0.015 }
+    }[model] || { in: 0.001, out: 0.003 };
+    const cost = (approxTokens * price.in / 1000);
+    tokenInfo.textContent = `~${approxTokens} tokens | $${cost.toFixed(4)} est.`;
+  }
+
+  // Sending core
+  async function send(isRegenerate = false) {
+    const conv = currentConv();
+    const content = isRegenerate ? '' : inputEl.value.trim();
+    const systemPrompt = systemEl.value.trim();
+    if (!content && !isRegenerate && pendingImages.length === 0) return;
+
+    // Append user message (with images if any)
+    if (!isRegenerate) {
+      const msg = { role: 'user', content, images: pendingImages.slice(), timestamp: Date.now() };
+      conv.messages.push(msg);
+      conv.name = conv.name === 'New chat' && content ? (content.slice(0, 30) + (content.length > 30 ? '…' : '')) : conv.name;
+      conv.updated = Date.now();
+      persist();
+      pendingImages = [];
+      // clean composer thumbs
+      [...inputEl.parentElement.querySelectorAll('.img-thumb')].forEach(n => n.remove());
+    }
+
+    inputEl.value = '';
+    autoResize();
+    renderChat();
+
+    const model = modelSel.value;
+    const endpoint = endpointSel.value;
+    const apiKey = apiKeyEl.value.trim();
+    controller = new AbortController();
+    const signal = controller.signal;
+
+    try {
+      if (endpoint === 'chat') {
+        // Build messages for chat.completions (supporting vision via image_url)
+        const messages = [];
+        if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
+
+        for (const m of conv.messages) {
+          if (m.role === 'user' && m.images?.length) {
+            const parts = [{ type: 'text', text: m.content || '' }];
+            for (const src of m.images) parts.push({ type: 'image_url', image_url: { url: src } });
+            messages.push({ role: 'user', content: parts });
+          } else {
+            messages.push({ role: m.role, content: m.content });
+          }
+        }
+
+        const url = apiKey ? 'https://api.openai.com/v1/chat/completions' : '/api/chat';
+        const headers = {
+          'Content-Type': 'application/json',
+          ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {})
+        };
+        const body = { model, messages, stream: true, temperature: 0.7 };
+
+        const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body), signal });
+        if (!res.ok) {
+          const t = await res.text();
+          throw new Error(t || 'Request failed');
+        }
+
+        // Prepare streaming UI
+        const box = addBubble('assistant', '', Date.now());
+        chatEl.scrollTop = chatEl.scrollHeight;
+        let assistantText = '';
+        // Append placeholder assistant in state
+        const aMsg = { role: 'assistant', content: '', timestamp: Date.now() };
+        conv.messages.push(aMsg);
+        persist();
+
+        const reader = res.body.getReader();
+        const dec = new TextDecoder('utf-8');
+        let buffer = '';
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += dec.decode(value, { stream: true });
+          const chunks = buffer.split('\n\n');
+          buffer = chunks.pop() || '';
+          for (const c of chunks) {
+            const line = c.trim();
+            if (!line.startsWith('data:')) continue;
+            const data = line.slice(5).trim();
+            if (data === '[DONE]') continue;
+            try {
+              const json = JSON.parse(data);
+              const delta = json.choices?.[0]?.delta?.content || '';
+              if (delta) {
+                assistantText += delta;
+                box.textContent = assistantText;
+                aMsg.content = assistantText;
+                conv.updated = Date.now();
+                persist();
+                chatEl.scrollTop = chatEl.scrollHeight;
+              }
+            } catch { /* ignore */ }
+          }
+        }
+      } else {
+        // Responses API - no streaming here for simplicity
+        const input = [];
+        if (systemPrompt) input.push({ role: 'system', content: systemPrompt });
+        for (const m of conv.messages) input.push({ role: m.role, content: m.content });
+
+        const url = apiKey ? 'https://api.openai.com/v1/responses' : '/api/chat';
+        const headers = {
+          'Content-Type': 'application/json',
+          ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {})
+        };
+        const body = { model, input };
+
+        const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body), signal });
+        if (!res.ok) {
+          const t = await res.text();
+          throw new Error(t || 'Request failed');
+        }
+        const data = await res.json();
+        const text = data.output_text || '';
+        const msg = { role: 'assistant', content: text, timestamp: Date.now() };
+        currentConv().messages.push(msg);
+        currentConv().updated = Date.now();
+        persist();
+        addBubble('assistant', text, msg.timestamp);
+      }
+    } catch (err) {
+      const msg = { role: 'assistant', content: 'Error: ' + (err.message || 'failed'), timestamp: Date.now() };
+      currentConv().messages.push(msg);
+      currentConv().updated = Date.now();
+      persist();
+      addBubble('assistant', msg.content, msg.timestamp);
+    } finally {
+      controller = null;
+      estimateTokensAndCost();
+    }
+  }
+
+  // Keyboard: Esc stops
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') stopStream(); });
+
+  // Welcome boot
+  if (currentConv().messages.length === 0) {
+    currentConv().messages.push({ role: 'assistant', content: 'Welcome! Start chatting. You can attach an image, pick a preset, and export your chats. For production, route through a backend proxy at /api/chat.', timestamp: Date.now() });
+    persist();
+    renderChat();
+  }
+})();
+</script>
+</body>
+</html>

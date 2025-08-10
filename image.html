@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <title>Prompt → Image (OpenAI)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <style>
+    :root{
+      --bg:#0f172a; --bg2:#1e293b; --card:#0b1220; --ink:#e5e7eb; --muted:#94a3b8; --line:rgba(255,255,255,.12);
+      --accent:#7c3aed; --accent2:#06b6d4; --ok:#22c55e; --err:#ef4444;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;height:100%}
+    body{
+      font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif;
+      background:linear-gradient(135deg,var(--bg),var(--bg2));
+      color:var(--ink); display:flex; align-items:center; justify-content:center; padding:16px;
+    }
+    .app{width:min(100%,1100px); background:rgba(255,255,255,.05); border:1px solid var(--line);
+      border-radius:16px; overflow:hidden; box-shadow:0 30px 80px rgba(0,0,0,.35)}
+    .top{display:flex; justify-content:space-between; align-items:center; padding:12px 16px; border-bottom:1px solid var(--line);
+      background:linear-gradient(90deg, rgba(124,58,237,.15), rgba(6,182,212,.12))}
+    .brand{font-weight:900}
+    .panel{display:grid; grid-template-columns:1fr; gap:14px; padding:16px}
+    .card{background:linear-gradient(180deg, rgba(17,24,39,.78), rgba(2,6,23,.78)); border:1px solid var(--line); border-radius:12px; padding:14px}
+    .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+    textarea,input,select{
+      width:100%; background:#0b1220; color:#fff; border:2px solid #101827; border-radius:10px; padding:10px; font-size:1rem;
+      outline:none; transition:border-color .15s ease, box-shadow .15s ease;
+    }
+    textarea:focus,input:focus,select:focus{border-color:#06b6d4; box-shadow:0 0 0 3px rgba(6,182,212,.15)}
+    .btn{
+      border:none; border-radius:10px; padding:10px 12px; font-weight:800; cursor:pointer; background:linear-gradient(45deg,#f8fafc,#e2e8f0);
+      color:#0b1220; transition:transform .1s ease, box-shadow .2s ease;
+    }
+    .btn:hover{transform:translateY(-1px); box-shadow:0 10px 18px rgba(0,0,0,.2)}
+    .btn.accent{background:linear-gradient(45deg,#7c3aed,#5b21b6); color:#fff}
+    .btn.err{background:linear-gradient(45deg,#ef4444,#b91c1c); color:#fff}
+    .small{color:var(--muted); font-size:.9rem}
+    .status{padding:10px 12px; border-radius:10px; font-weight:800; display:none}
+    .status.ok{background:rgba(34,197,94,.15); color:#bbf7d0; border:1px solid rgba(34,197,94,.25)}
+    .status.err{background:rgba(239,68,68,.15); color:#fecaca; border:1px solid rgba(239,68,68,.25)}
+    .grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(220px,1fr)); gap:12px}
+    .imgcard{background:#0b1220; border:1px solid var(--line); border-radius:10px; padding:10px; display:flex; flex-direction:column; gap:8px}
+    .imgcard img{width:100%; height:auto; border-radius:8px; background:#000}
+    .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="top">
+      <div class="brand">Prompt → Image (OpenAI)</div>
+      <div class="small">Use a backend in production to keep API keys safe.</div>
+    </div>
+
+    <div class="panel">
+      <!-- Prompt + Options -->
+      <div class="card">
+        <div class="row">
+          <textarea id="prompt" rows="3" placeholder="Describe the image clearly (e.g., A bright, kid-friendly illustration of a panda reading under a tree with soft pastel colors)"></textarea>
+        </div>
+        <div class="row">
+          <select id="apiMode">
+            <option value="images">Image API (gpt-image-1)</option>
+            <option value="responses">Responses API (image_generation tool)</option>
+          </select>
+          <select id="size">
+            <option value="512x512">512x512</option>
+            <option value="768x768">768x768</option>
+            <option value="1024x1024" selected>1024x1024</option>
+          </select>
+          <select id="n">
+            <option value="1" selected>1 image</option>
+            <option value="2">2 images</option>
+            <option value="3">3 images</option>
+          </select>
+          <select id="quality">
+            <option value="standard" selected>standard</option>
+            <option value="hd">hd</option>
+          </select>
+        </div>
+        <div class="row">
+          <input id="apiKey" placeholder="OpenAI API Key (for local testing only)"/>
+        </div>
+        <div class="row">
+          <button id="btnGenerate" class="btn accent">Generate Image</button>
+          <button id="btnClear" class="btn err">Clear</button>
+          <div id="status" class="status"></div>
+        </div>
+        <div class="small">
+          By default this uses OpenAI’s Images or Responses APIs with gpt-image-1; see docs for sizes, quality, n, and streaming partials[1][7].
+        </div>
+      </div>
+
+      <!-- Results -->
+      <div class="card">
+        <div class="row" style="justify-content:space-between; align-items:center">
+          <div class="small"><b>Results</b> — click to open, use “Download” to save PNG.</div>
+          <div class="small">API: <span class="mono" id="apiInfo"></span></div>
+        </div>
+        <div id="results" class="grid"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // References
+    const promptEl = document.getElementById('prompt');
+    const sizeEl = document.getElementById('size');
+    const nEl = document.getElementById('n');
+    const qualityEl = document.getElementById('quality');
+    const apiKeyEl = document.getElementById('apiKey');
+    const apiModeEl = document.getElementById('apiMode');
+    const btnGenerate = document.getElementById('btnGenerate');
+    const btnClear = document.getElementById('btnClear');
+    const statusEl = document.getElementById('status');
+    const resultsEl = document.getElementById('results');
+    const apiInfoEl = document.getElementById('apiInfo');
+
+    apiInfoEl.textContent = 'images.generate (gpt-image-1)';
+
+    apiModeEl.addEventListener('change', ()=>{
+      apiInfoEl.textContent = apiModeEl.value === 'images'
+        ? 'images.generate (gpt-image-1)'
+        : 'responses.create + image_generation tool (gpt-image-1)';
+    });
+
+    function showStatus(msg, kind='ok'){
+      statusEl.textContent = msg;
+      statusEl.className = 'status ' + kind;
+      statusEl.style.display = 'block';
+    }
+    function hideStatus(){
+      statusEl.style.display = 'none';
+    }
+
+    function b64ToBlob(b64, mime='image/png'){
+      const byteChars = atob(b64);
+      const byteNumbers = new Array(byteChars.length);
+      for (let i = 0; i < byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i);
+      const byteArray = new Uint8Array(byteNumbers);
+      return new Blob([byteArray], { type: mime });
+    }
+
+    function renderImages(b64List, mime='image/png'){
+      resultsEl.innerHTML = '';
+      b64List.forEach((b64, idx)=>{
+        const blob = b64ToBlob(b64, mime);
+        const url = URL.createObjectURL(blob);
+
+        const card = document.createElement('div');
+        card.className = 'imgcard';
+        const img = document.createElement('img');
+        img.src = url;
+        img.alt = 'generated image ' + (idx+1);
+        img.onclick = ()=> window.open(url, '_blank', 'noopener');
+
+        const row = document.createElement('div');
+        row.className = 'row';
+        const dl = document.createElement('button');
+        dl.className = 'btn';
+        dl.textContent = 'Download';
+        dl.onclick = ()=>{
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `image_${Date.now()}_${idx+1}.png`;
+          a.click();
+        };
+        row.appendChild(dl);
+
+        card.appendChild(img);
+        card.appendChild(row);
+        resultsEl.appendChild(card);
+      });
+    }
+
+    async function generateWithImagesAPI({apiKey, prompt, size, n, quality}){
+      // POST https://api.openai.com/v1/images/generate or images/generations depending on SDK evolution.
+      // Current docs use images.generate via SDK and b64_json in result[1][14].
+      const endpoint = 'https://api.openai.com/v1/images/generations';
+      const body = {
+        model: 'gpt-image-1',
+        prompt,
+        size,
+        n: Number(n),
+        quality
+      };
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type':'application/json',
+          'Authorization': 'Bearer ' + apiKey
+        },
+        body: JSON.stringify(body)
+      });
+      if (!res.ok){
+        const txt = await res.text().catch(()=> '');
+        throw new Error('Images API error: ' + res.status + ' ' + res.statusText + ' - ' + txt);
+      }
+      const json = await res.json();
+      // Expect json.data[].b64_json (if response_format default is base64)[1][14]
+      const list = (json.data || []).map(x => x.b64_json).filter(Boolean);
+      if (!list.length) throw new Error('No image returned.');
+      return list;
+    }
+
+    async function generateWithResponsesAPI({apiKey, prompt}){
+      // Responses API with image_generation tool; output contains base64 images[1][7][16]
+      const endpoint = 'https://api.openai.com/v1/responses';
+      const body = {
+        model: 'gpt-4.1-mini',
+        input: prompt,
+        tools: [{ type: 'image_generation' }]
+      };
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type':'application/json',
+          'Authorization': 'Bearer ' + apiKey
+        },
+        body: JSON.stringify(body)
+      });
+      if (!res.ok){
+        const txt = await res.text().catch(()=> '');
+        throw new Error('Responses API error: ' + res.status + ' ' + res.statusText + ' - ' + txt);
+      }
+      const json = await res.json();
+      // Collect image_generation_call outputs -> result is base64 data[1][7]
+      const b64 = [];
+      const out = json.output || [];
+      for (const item of out){
+        if (item.type === 'image_generation_call' && item.result){
+          b64.push(item.result);
+        }
+      }
+      if (!b64.length) throw new Error('No image returned.');
+      return b64;
+    }
+
+    btnGenerate.addEventListener('click', async ()=>{
+      const prompt = promptEl.value.trim();
+      if (!prompt){ showStatus('Please enter a prompt.', 'err'); return; }
+      const apiKey = apiKeyEl.value.trim();
+      if (!apiKey){ showStatus('Enter API key for local testing (use a backend in production).', 'err'); return; }
+
+      const size = sizeEl.value;
+      const n = nEl.value;
+      const quality = qualityEl.value;
+      const mode = apiModeEl.value;
+
+      resultsEl.innerHTML = '';
+      showStatus('Generating image...', 'ok');
+      btnGenerate.disabled = true;
+
+      try{
+        let imagesB64 = [];
+        if (mode === 'images'){
+          imagesB64 = await generateWithImagesAPI({apiKey, prompt, size, n, quality});
+        } else {
+          imagesB64 = await generateWithResponsesAPI({apiKey, prompt});
+        }
+        renderImages(imagesB64, 'image/png');
+        showStatus('Done.', 'ok');
+      }catch(e){
+        showStatus(e.message || 'Generation failed', 'err');
+      }finally{
+        btnGenerate.disabled = false;
+      }
+    });
+
+    btnClear.addEventListener('click', ()=>{
+      promptEl.value = '';
+      resultsEl.innerHTML = '';
+      hideStatus();
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Name Finder – Smart People Search</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+  <style>
+    :root{
+      --bg1:#0f172a; --bg2:#1e293b; --card:#0b1220; --ink:#e5e7eb; --muted:#94a3b8;
+      --accent:#7c3aed; --accent2:#06b6d4; --accent3:#f59e0b; --ok:#22c55e; --err:#ef4444;
+      --chip:#111827; --chipText:#d1d5db;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0}
+    body{
+      font-family: Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif;
+      color:var(--ink); background:linear-gradient(135deg,var(--bg1),var(--bg2));
+      min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px;
+    }
+    .app{width:100%; max-width:1100px; background:rgba(255,255,255,.04); backdrop-filter: blur(10px);
+      border:1px solid rgba(255,255,255,.08); border-radius:20px; overflow:hidden; box-shadow:0 30px 80px rgba(0,0,0,.35)}
+    .header{
+      display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between;
+      padding:18px 20px; background:linear-gradient(90deg,rgba(124,58,237,.2),rgba(6,182,212,.15),rgba(245,158,11,.15));
+      border-bottom:1px solid rgba(255,255,255,.06)
+    }
+    .brand{display:flex; gap:10px; align-items:center; font-weight:900; letter-spacing:.3px}
+    .brand .logo{display:inline-flex; width:36px; height:36px; align-items:center; justify-content:center; border-radius:10px;
+      background:linear-gradient(45deg,var(--accent),var(--accent2)); box-shadow:0 10px 25px rgba(124,58,237,.35)}
+    .brand span{font-size:1.1rem}
+    .toolbar{display:flex; gap:10px; align-items:center}
+    .pill{display:inline-flex; gap:8px; align-items:center; padding:8px 12px; border-radius:999px; background:rgba(255,255,255,.06); color:#fff; font-weight:700}
+    .btn{
+      border:none; border-radius:10px; padding:10px 12px; font-weight:800; color:#0b1220; cursor:pointer;
+      background:linear-gradient(45deg,#f8fafc,#e2e8f0); transition:transform .1s ease, box-shadow .2s ease;
+    }
+    .btn:hover{transform:translateY(-1px); box-shadow:0 10px 20px rgba(0,0,0,.2)}
+    .btn.ghost{background:transparent; color:var(--ink); border:1px solid rgba(255,255,255,.15)}
+    .btn.accent{background:linear-gradient(45deg,var(--accent),#5b21b6); color:#fff}
+    .btn.ok{background:linear-gradient(45deg,var(--ok),#16a34a); color:#fff}
+    .btn.err{background:linear-gradient(45deg,var(--err),#b91c1c); color:#fff}
+
+    .main{display:grid; grid-template-columns: 1fr 310px; gap:16px; padding:16px}
+    @media (max-width: 980px){ .main{grid-template-columns:1fr} }
+
+    .card{background:linear-gradient(180deg, rgba(17,24,39,.75), rgba(2,6,23,.75));
+      border:1px solid rgba(255,255,255,.06); border-radius:16px; overflow:hidden}
+    .card .title{padding:14px 16px; font-weight:900; border-bottom:1px solid rgba(255,255,255,.06); display:flex; gap:10px; align-items:center}
+    .card .content{padding:14px 16px}
+
+    .searchbar{display:grid; grid-template-columns:1fr auto auto; gap:10px}
+    @media (max-width:640px){ .searchbar{grid-template-columns:1fr} }
+    .input{
+      background:#0b1220; border:2px solid #0f172a; color:#fff; border-radius:12px; outline:none;
+      padding:14px 14px; font-size:1rem; transition:border-color .2s ease, box-shadow .2s ease;
+    }
+    .input:focus{border-color:var(--accent2); box-shadow:0 0 0 3px rgba(6,182,212,.12)}
+
+    .filters{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px}
+    .chips{display:flex; gap:8px; flex-wrap:wrap}
+    .chip{padding:6px 10px; border-radius:999px; background:var(--chip); color:var(--chipText); font-size:.8rem; font-weight:800; border:1px solid rgba(255,255,255,.06); cursor:default}
+
+    .results{display:grid; gap:12px}
+    .result{
+      display:grid; grid-template-columns: 1fr auto; gap:10px; padding:12px; border-radius:12px;
+      border:1px solid rgba(255,255,255,.06); background:rgba(255,255,255,.03)
+    }
+    .result h3{margin:0 0 6px 0; font-size:1.05rem}
+    .result p{margin:0; color:var(--muted)}
+    .result .meta{display:flex; gap:10px; align-items:center; color:#cbd5e1; font-size:.85rem; margin-top:8px}
+    .result .actions{display:flex; gap:8px}
+    .result a.btn{ text-decoration:none }
+
+    .side .section{margin-bottom:12px}
+    .row{display:flex; gap:10px}
+    .switch{display:flex; gap:8px; align-items:center}
+    .switch input{width:46px; height:24px}
+
+    .status{padding:10px 12px; border-radius:10px; margin-top:10px; font-weight:800; display:none}
+    .status.ok{background:rgba(34,197,94,.15); color:#bbf7d0; border:1px solid rgba(34,197,94,.25)}
+    .status.err{background:rgba(239,68,68,.15); color:#fecaca; border:1px solid rgba(239,68,68,.25)}
+    .status.info{background:rgba(6,182,212,.15); color:#a5f3fc; border:1px solid rgba(6,182,212,.25)}
+
+    .gridbar{display:flex; align-items:center; justify-content:space-between; margin-bottom:10px}
+    .pagination{display:flex; gap:8px; align-items:center}
+    .small{font-size:.86rem; color:var(--muted)}
+
+    .kbd{background:#0b1220; border:1px solid rgba(255,255,255,.12); padding:2px 6px; border-radius:6px; font-size:.78rem}
+    .hint{color:#94a3b8; font-size:.9rem}
+
+    .empty{padding:20px; text-align:center; color:#94a3b8}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="header">
+      <div class="brand">
+        <div class="logo"><i class="fa-solid fa-magnifying-glass"></i></div>
+        <span>Name Finder</span>
+      </div>
+      <div class="toolbar">
+        <div class="pill"><i class="fa-solid fa-sparkles"></i> AI-ready</div>
+        <button id="btnDark" class="btn ghost"><i class="fa-solid fa-moon"></i> Theme</button>
+        <button id="btnExport" class="btn"><i class="fa-solid fa-file-export"></i> Export</button>
+        <button id="btnClear" class="btn err"><i class="fa-solid fa-broom"></i> Clear</button>
+      </div>
+    </div>
+
+    <div class="main">
+      <!-- Left: Search + Results -->
+      <div class="card">
+        <div class="title"><i class="fa-solid fa-user"></i> Search any name</div>
+        <div class="content">
+          <div class="searchbar">
+            <input id="q" class="input" placeholder="Type a name (e.g., Sundar Pichai, Virat Kohli, Priyanka Chopra) and press Enter" />
+            <select id="source" class="input" style="max-width:220px">
+              <option value="bing">Bing Web Search API</option>
+              <option value="ddg">DuckDuckGo (Instant Answers + HTML)</option>
+              <option value="custom">Custom Backend API</option>
+            </select>
+            <button id="btnSearch" class="btn accent"><i class="fa-solid fa-magnifying-glass"></i> Search</button>
+          </div>
+
+          <div class="filters">
+            <div class="row">
+              <select id="type" class="input">
+                <option value="all">All results</option>
+                <option value="news">News</option>
+                <option value="video">Video</option>
+                <option value="image">Image</option>
+                <option value="blog">Blogs</option>
+                <option value="social">Social</option>
+              </select>
+              <select id="fresh" class="input">
+                <option value="anytime">Any time</option>
+                <option value="d">Past 24 hours</option>
+                <option value="w">Past week</option>
+                <option value="m">Past month</option>
+                <option value="y">Past year</option>
+              </select>
+            </div>
+            <div class="chips">
+              <span class="chip" title="Use quotes for exact match">"Exact match"</span>
+              <span class="chip">–exclude terms</span>
+              <span class="chip">site:linkedin.com</span>
+              <span class="chip">filetype:pdf</span>
+            </div>
+          </div>
+
+          <div class="gridbar">
+            <div class="small" id="countInfo">Ready.</div>
+            <div class="pagination">
+              <button id="prev" class="btn ghost"><i class="fa-solid fa-chevron-left"></i></button>
+              <span class="small"><span id="pageNum">1</span>/<span id="pageMax">1</span></span>
+              <button id="next" class="btn ghost"><i class="fa-solid fa-chevron-right"></i></button>
+            </div>
+          </div>
+
+          <div id="status" class="status info"></div>
+          <div id="results" class="results"></div>
+          <div id="empty" class="empty" style="display:none">No results yet. Try a name and hit Search. Tip: press <span class="kbd">Enter</span>.</div>
+        </div>
+      </div>
+
+      <!-- Right: Options + Saved -->
+      <div class="card side">
+        <div class="title"><i class="fa-solid fa-gear"></i> Options</div>
+        <div class="content">
+          <div class="section">
+            <label class="small">API configuration</label>
+            <div class="row" style="margin-top:8px">
+              <input id="apiKey" class="input" placeholder="API key or token (if required)" />
+            </div>
+            <div class="row" style="margin-top:8px">
+              <input id="customUrl" class="input" placeholder="Custom backend endpoint (e.g., https://your-api/search)" />
+            </div>
+            <div class="hint" style="margin-top:6px">
+              Use official APIs or your own backend proxy for reliable, compliant results.
+            </div>
+          </div>
+
+          <div class="section">
+            <label class="small">Smart features</label>
+            <div class="row" style="margin-top:8px">
+              <button id="btnEnrich" class="btn"><i class="fa-solid fa-wand-magic-sparkles"></i> Enrich Titles</button>
+              <button id="btnPreview" class="btn"><i class="fa-solid fa-eye"></i> Quick Preview</button>
+            </div>
+            <div class="row" style="margin-top:8px">
+              <div class="switch">
+                <input id="safe" type="checkbox" />
+                <label for="safe" class="small">Safe results</label>
+              </div>
+              <div class="switch">
+                <input id="cache" type="checkbox" checked />
+                <label for="cache" class="small">Cache this search</label>
+              </div>
+            </div>
+          </div>
+
+          <div class="section">
+            <label class="small">Saved searches</label>
+            <div id="saved" class="chips" style="margin-top:8px"></div>
+          </div>
+
+          <div class="section">
+            <label class="small">Keyboard tips</label>
+            <div class="hint" style="margin-top:6px">
+              Enter: Search • Ctrl/⌘+K: Focus search • ←/→: Prev/Next page
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+<script>
+/*
+  Implementation notes:
+  - This client uses fetch() to call either:
+      1) Bing Web Search API (via your key)
+      2) DuckDuckGo endpoints (Instant Answers; HTML fallback via your backend proxy)
+      3) Your custom backend (recommended for Google/Bing/SerpAPI aggregation)
+  - Replace placeholders with your credentials/endpoints.
+  - Never scrape Google directly from the browser; use an API or your server.
+*/
+
+// State
+let page = 1;
+let pageSize = 10;
+let total = 0;
+let dark = true;
+let lastQuery = '';
+let resultsCache = {}; // key: q|page|source|filters -> array
+let items = [];
+
+// Elements
+const q = document.getElementById('q');
+const source = document.getElementById('source');
+const type = document.getElementById('type');
+const fresh = document.getElementById('fresh');
+const safe = document.getElementById('safe');
+const cacheBox = document.getElementById('cache');
+
+const apiKey = document.getElementById('apiKey');
+const customUrl = document.getElementById('customUrl');
+
+const btnSearch = document.getElementById('btnSearch');
+const btnDark = document.getElementById('btnDark');
+const btnExport = document.getElementById('btnExport');
+const btnClear = document.getElementById('btnClear');
+const btnEnrich = document.getElementById('btnEnrich');
+const btnPreview = document.getElementById('btnPreview');
+const prevBtn = document.getElementById('prev');
+const nextBtn = document.getElementById('next');
+
+const countInfo = document.getElementById('countInfo');
+const pageNum = document.getElementById('pageNum');
+const pageMax = document.getElementById('pageMax');
+const statusEl = document.getElementById('status');
+const resultsEl = document.getElementById('results');
+const emptyEl = document.getElementById('empty');
+const savedEl = document.getElementById('saved');
+
+// Helpers
+function showStatus(msg, kind='info'){
+  statusEl.textContent = msg;
+  statusEl.className = 'status ' + kind;
+  statusEl.style.display = 'block';
+}
+function hideStatus(){ statusEl.style.display='none'; }
+
+function keyFor(q, p){
+  return JSON.stringify({q, p, s: source.value, t: type.value, f: fresh.value, safe: safe.checked});
+}
+
+function applyFilters(list){
+  let out = list;
+  const t = type.value;
+  if (t !== 'all'){
+    out = out.filter(x => {
+      const u = (x.url || '').toLowerCase();
+      if (t==='news') return u.includes('/news') || (x.type==='news');
+      if (t==='video') return u.includes('youtube.com') || u.includes('vimeo.com') || (x.type==='video');
+      if (t==='image') return (x.type==='image');
+      if (t==='blog') return u.includes('medium.com') || u.includes('blog') || u.includes('substack');
+      if (t==='social') return u.includes('linkedin.com')||u.includes('twitter.com')||u.includes('x.com')||u.includes('instagram.com');
+      return true;
+    });
+  }
+  // freshness hint (client-only: we do not re-rank by date; real freshness via API params)
+  return out;
+}
+
+function render(){
+  resultsEl.innerHTML = '';
+  if (!items || items.length===0){
+    emptyEl.style.display = 'block';
+    countInfo.textContent = 'No results.';
+    pageNum.textContent = '1'; pageMax.textContent = '1';
+    return;
+  }
+  emptyEl.style.display = 'none';
+  const filtered = applyFilters(items);
+  total = filtered.length;
+  const maxPage = Math.max(1, Math.ceil(total / pageSize));
+  page = Math.min(page, maxPage);
+  const start = (page-1)*pageSize;
+  const slice = filtered.slice(start, start + pageSize);
+
+  slice.forEach(r => {
+    const card = document.createElement('div');
+    card.className = 'result';
+    const host = safeHost(r.url);
+    card.innerHTML = `
+      <div>
+        <h3>${escapeHTML(r.title || host || 'Untitled')}</h3>
+        <p>${escapeHTML(r.snippet || r.description || '')}</p>
+        <div class="meta">
+          <span><i class="fa-regular fa-link"></i> ${escapeHTML(host || '')}</span>
+          ${r.published ? `<span><i class="fa-regular fa-clock"></i> ${escapeHTML(r.published)}</span>` : ''}
+          ${r.source ? `<span><i class="fa-solid fa-database"></i> ${escapeHTML(r.source)}</span>` : ''}
+        </div>
+      </div>
+      <div class="actions">
+        <a class="btn" href="${r.url}" target="_blank" rel="noopener">Open</a>
+        <button class="btn ghost" data-url="${r.url}" onclick="copyLink(event)">Copy</button>
+      </div>
+    `;
+    resultsEl.appendChild(card);
+  });
+
+  pageNum.textContent = String(page);
+  pageMax.textContent = String(maxPage);
+  countInfo.textContent = `${total} results • Page ${page}/${maxPage}`;
+}
+
+function escapeHTML(s=''){
+  return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function safeHost(u){
+  try{ return new URL(u).host; }catch{ return '' }
+}
+
+function paginate(delta){
+  page = Math.max(1, page + delta);
+  render();
+}
+
+function setDarkMode(on){
+  dark = on;
+  document.body.style.background = on
+    ? 'linear-gradient(135deg,#0f172a,#1e293b)'
+    : 'linear-gradient(135deg,#f4f7fb,#e8eef6)';
+}
+
+// API calls (client)
+async function searchBing(name){
+  // Requires Bing Web Search API key (Azure Cognitive Services)
+  // Endpoint: https://api.bing.microsoft.com/v7.0/search?q=...
+  const key = apiKey.value.trim();
+  if (!key) throw new Error('Bing API key required.');
+  const params = new URLSearchParams({ q: name, count: '30', mkt:'en-US', safeSearch: safe.checked ? 'Moderate' : 'Off' });
+  const url = 'https://api.bing.microsoft.com/v7.0/search?' + params.toString();
+  const res = await fetch(url, { headers: { 'Ocp-Apim-Subscription-Key': key }});
+  if (!res.ok) throw new Error('Bing search failed: ' + res.status);
+  const data = await res.json();
+  const web = (data.webPages && data.webPages.value) ? data.webPages.value : [];
+  return web.map(x => ({
+    title: x.name,
+    url: x.url,
+    snippet: x.snippet,
+    published: x.dateLastCrawled ? new Date(x.dateLastCrawled).toLocaleDateString() : '',
+    source: 'Bing'
+  }));
+}
+
+async function searchDuckDuckGo(name){
+  // Two-step strategy:
+  // 1) call Instant Answers (light info)
+  // 2) optional: call your own backend to fetch DDG HTML SERP and parse server-side
+  const out = [];
+  const instant = await fetch('https://api.duckduckgo.com/?q=' + encodeURIComponent(name) + '&format=json&no_redirect=1&no_html=1');
+  if (instant.ok){
+    const j = await instant.json();
+    if (j.AbstractURL) out.push({ title: j.Heading || j.AbstractText || j.AbstractURL, url: j.AbstractURL, snippet: j.AbstractText || '', source:'DuckDuckGo' });
+    if (Array.isArray(j.RelatedTopics)){
+      j.RelatedTopics.slice(0, 10).forEach(t => {
+        if (t.FirstURL) out.push({ title: t.Text || t.FirstURL, url: t.FirstURL, snippet:'', source:'DuckDuckGo' });
+      });
+    }
+  }
+  // Optional HTML SERP via your backend proxy (to stay compliant and reliable)
+  const proxy = (customUrl.value || '').trim();
+  if (proxy){
+    try{
+      const res = await fetch(proxy + '?engine=ddg&q=' + encodeURIComponent(name));
+      if (res.ok){
+        const arr = await res.json(); // expect [{title,url,snippet,published},...]
+        arr.forEach(x => out.push({ ...x, source: 'DuckDuckGo' }));
+      }
+    }catch(e){}
+  }
+  return out;
+}
+
+async function searchCustom(name){
+  // Your unified search backend: aggregates Bing/Brave/SerpAPI/etc.
+  // Must return JSON array: [{title,url,snippet,published,source}, ...]
+  const url = (customUrl.value || '').trim();
+  if (!url) throw new Error('Custom backend URL required.');
+  const res = await fetch(url + '?q=' + encodeURIComponent(name));
+  if (!res.ok) throw new Error('Custom backend error: ' + res.status);
+  return res.json();
+}
+
+async function doSearch(){
+  const name = q.value.trim();
+  if (!name){ showStatus('Please type a name to search.', 'err'); return; }
+  hideStatus();
+  showStatus('Searching "' + name + '"...', 'info');
+  lastQuery = name;
+  page = 1;
+
+  const k = keyFor(name, page);
+  if (cacheBox.checked && resultsCache[k]){
+    items = resultsCache[k];
+    hideStatus();
+    render();
+    rememberSearch(name);
+    return;
+  }
+
+  try{
+    let list = [];
+    if (source.value==='bing'){
+      list = await searchBing(name);
+    }else if (source.value==='ddg'){
+      list = await searchDuckDuckGo(name);
+    }else{
+      list = await searchCustom(name);
+    }
+
+    // Basic dedupe by URL
+    const seen = new Set();
+    items = list.filter(x => {
+      if (!x.url) return false;
+      const key = x.url.split('#')[0];
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    if (cacheBox.checked) resultsCache[k] = items;
+    hideStatus();
+    rememberSearch(name);
+    render();
+    if (items.length===0) showStatus('No results found. Try changing source or filters.', 'info');
+  }catch(e){
+    console.error(e);
+    showStatus(e.message || 'Search failed.', 'err');
+    items = [];
+    render();
+  }
+}
+
+function rememberSearch(term){
+  const saved = getSaved();
+  if (saved.includes(term)) return;
+  saved.unshift(term);
+  if (saved.length>10) saved.pop();
+  localStorage.setItem('savedSearches', JSON.stringify(saved));
+  renderSaved();
+}
+
+function getSaved(){
+  try{
+    const s = JSON.parse(localStorage.getItem('savedSearches') || '[]');
+    return Array.isArray(s) ? s : [];
+  }catch{ return [] }
+}
+function renderSaved(){
+  savedEl.innerHTML = '';
+  const s = getSaved();
+  if (s.length===0){
+    savedEl.innerHTML = '<span class="chip">No saved searches</span>';
+    return;
+  }
+  s.forEach(term => {
+    const b = document.createElement('button');
+    b.className = 'btn ghost';
+    b.textContent = term;
+    b.style.whiteSpace='nowrap';
+    b.onclick = ()=>{ q.value = term; doSearch(); };
+    savedEl.appendChild(b);
+  });
+}
+
+function exportJSON(){
+  const data = { query:lastQuery, items };
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `search_${(lastQuery||'results').replace(/\s+/g,'_')}.json`;
+  a.click();
+}
+
+function clearAll(){
+  items = [];
+  resultsEl.innerHTML = '';
+  emptyEl.style.display = 'block';
+  total = 0; page = 1;
+  countInfo.textContent = 'Ready.';
+  pageNum.textContent = '1'; pageMax.textContent = '1';
+  hideStatus();
+}
+
+function copyLink(e){
+  const url = e.currentTarget.getAttribute('data-url');
+  if (!url) return;
+  navigator.clipboard.writeText(url).then(()=>{
+    showStatus('Link copied.', 'ok');
+    setTimeout(hideStatus, 1000);
+  });
+}
+
+function enrichTitles(){
+  // Simple client-side enrichment: add source host to title if missing
+  items = items.map(x => {
+    if (!x.title || x.title.length<5){
+      const host = safeHost(x.url) || '';
+      return {...x, title: host ? ('['+host+'] ' + (x.title||'Link')) : (x.title||'Link')};
+    }
+    return x;
+  });
+  render();
+}
+
+function quickPreview(){
+  // Open top 3 results in new tabs as a "preview"
+  const top = items.slice(0,3);
+  if (top.length===0){ showStatus('No results to preview.', 'err'); return; }
+  top.forEach(x => x.url && window.open(x.url, '_blank', 'noopener'));
+}
+
+// Events
+btnSearch.addEventListener('click', doSearch);
+q.addEventListener('keydown', (e)=>{ if (e.key==='Enter') doSearch(); });
+prevBtn.addEventListener('click', ()=> paginate(-1));
+nextBtn.addEventListener('click', ()=> paginate(+1));
+
+btnDark.addEventListener('click', ()=> setDarkMode(!dark));
+btnExport.addEventListener('click', exportJSON);
+btnClear.addEventListener('click', clearAll);
+btnEnrich.addEventListener('click', enrichTitles);
+btnPreview.addEventListener('click', quickPreview);
+
+// Keyboard shortcuts
+window.addEventListener('keydown', (e)=>{
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase()==='k'){ e.preventDefault(); q.focus(); q.select(); }
+  if (e.key==='ArrowLeft'){ paginate(-1); }
+  if (e.key==='ArrowRight'){ paginate(+1); }
+});
+
+// Initialize
+setDarkMode(true);
+renderSaved();
+</script>
+</body>
+</html>

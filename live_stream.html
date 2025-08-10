@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Live Camera Stream • Pro UI</title>
+<style>
+  :root{
+    --bg:#0b0d10; --surface:#131820; --muted:#1e2530; --text:#e6eaf0; --text-dim:#a5afbd;
+    --brand:#6ea8fe; --ok:#7ee787; --warn:#f2cc60; --danger:#ff8080;
+    --radius:14px; --shadow:0 12px 30px rgba(0,0,0,.35);
+    --card-grad:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01));
+  }
+  [data-theme="light"]{
+    --bg:#f6f8fb; --surface:#ffffff; --muted:#e9eef5; --text:#0b1320; --text-dim:#5b6678;
+    --brand:#2563eb; --ok:#059669; --warn:#b7791f; --danger:#dc2626; --shadow:0 8px 24px rgba(16,24,40,.08);
+    --card-grad:linear-gradient(180deg, rgba(0,0,0,.02), rgba(0,0,0,.01));
+  }
+  html,body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+  .header{position:sticky;top:0;z-index:30;backdrop-filter:blur(8px);border-bottom:1px solid var(--muted);background:color-mix(in srgb,var(--bg) 80%, transparent)}
+  .nav{max-width:1100px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;padding:12px 16px}
+  .brand{display:flex;gap:10px;align-items:center;font-weight:800}
+  .badge{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;background:linear-gradient(135deg,var(--brand),var(--ok));color:#081018;box-shadow:var(--shadow);font-weight:900}
+  .actions{display:flex;gap:10px;align-items:center}
+  .btn{border:1px solid var(--muted);background:var(--surface);color:var(--text);padding:8px 12px;border-radius:10px;cursor:pointer}
+  .btn.primary{background:linear-gradient(135deg,var(--brand),var(--ok));border:none;color:#081018;font-weight:700}
+  .btn.danger{border-color:color-mix(in srgb,var(--danger) 55%, var(--muted));color:var(--danger)}
+  .main{max-width:1100px;margin:24px auto;padding:0 16px;display:grid;grid-template-columns:1fr;gap:16px}
+  @media (min-width: 1000px){ .main{grid-template-columns: 1.4fr .9fr} }
+  .panel{background:var(--surface);border:1px solid var(--muted);border-radius:var(--radius);box-shadow:var(--shadow);padding:14px;background-image:var(--card-grad)}
+  .video-wrap{position:relative;overflow:hidden;border-radius:12px;border:1px solid var(--muted)}
+  video{display:block;width:100%;height:auto;transform-origin:center center}
+  .overlay-grid{position:absolute;inset:0;pointer-events:none;opacity:.35;background-image:
+    linear-gradient(to right, rgba(255,255,255,.3) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255,255,255,.3) 1px, transparent 1px);
+    background-size: calc(100%/3) calc(100%/3);
+    display:none;
+  }
+  .stats{display:flex;flex-wrap:wrap;gap:8px;color:var(--text-dim);font-size:13px;margin-top:8px}
+  .controls{display:grid;gap:10px}
+  .group{border:1px solid var(--muted);border-radius:12px;padding:12px}
+  .group h3{margin:0 0 8px;font-size:14px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.06em}
+  .row{display:flex;gap:8px;flex-wrap:wrap}
+  .row > * {flex:1 1 auto}
+  label{font-size:13px;color:var(--text-dim)}
+  select,input[type="range"]{width:100%;background:var(--surface);color:var(--text);border:1px solid var(--muted);border-radius:8px;padding:8px}
+  .pill{display:inline-flex;gap:8px;align-items:center;border:1px solid var(--muted);background:var(--surface);padding:8px 10px;border-radius:999px}
+  canvas{display:none}
+  .footer{max-width:1100px;margin:8px auto 40px;padding:0 16px;color:var(--text-dim);font-size:13px}
+</style>
+</head>
+<body>
+  <header class="header">
+    <nav class="nav">
+      <div class="brand"><div class="badge">LC</div><div>Live Camera Stream</div></div>
+      <div class="actions">
+        <button id="themeBtn" class="btn">Toggle theme</button>
+      </div>
+    </nav>
+  </header>
+
+  <main class="main">
+    <section class="panel">
+      <div class="video-wrap" id="videoWrap">
+        <video id="video" playsinline autoplay muted></video>
+        <div id="grid" class="overlay-grid"></div>
+      </div>
+      <div class="stats">
+        <span id="statRes">Res: –</span>
+        <span id="statFps">FPS: –</span>
+        <span id="statFacing">Facing: –</span>
+        <span id="statMic">Mic: off</span>
+        <span id="recordingBadge" style="color:var(--warn);display:none">Recording…</span>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button id="startBtn" class="btn primary">Start Camera</button>
+        <button id="stopBtn" class="btn danger">Stop Camera</button>
+        <button id="pipBtn" class="btn">Picture-in-Picture</button>
+        <button id="fsBtn" class="btn">Fullscreen</button>
+      </div>
+    </section>
+
+    <aside class="panel controls">
+      <div class="group">
+        <h3>Source & Quality</h3>
+        <div class="row">
+          <select id="deviceSelect"></select>
+          <select id="resSelect">
+            <option value="default">Auto</option>
+            <option value="hd">720p</option>
+            <option value="fhd">1080p</option>
+          </select>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <button id="switchBtn" class="btn">Switch front/rear</button>
+          <button id="applyBtn" class="btn">Apply</button>
+        </div>
+      </div>
+
+      <div class="group">
+        <h3>Audio & Video Controls</h3>
+        <div class="row">
+          <button id="toggleMicBtn" class="btn">Mic: Off</button>
+          <button id="toggleMuteVideoBtn" class="btn">Video: On</button>
+        </div>
+        <div style="margin-top:8px">
+          <label for="zoomRange">Zoom (digital)</label>
+          <input id="zoomRange" type="range" min="1" max="3" step="0.05" value="1" />
+        </div>
+        <div style="margin-top:8px" class="row">
+          <label class="pill"><input id="gridToggle" type="checkbox" /> Grid overlay</label>
+          <label class="pill"><input id="mirrorToggle" type="checkbox" checked /> Mirror</label>
+        </div>
+      </div>
+
+      <div class="group">
+        <h3>Capture & Record</h3>
+        <div class="row">
+          <button id="snapBtn" class="btn">Snapshot</button>
+          <button id="recordBtn" class="btn">Start Recording</button>
+          <button id="downloadBtn" class="btn" disabled>Download</button>
+        </div>
+        <canvas id="canvas"></canvas>
+      </div>
+
+      <div class="group">
+        <h3>Troubleshooting</h3>
+        <p style="color:var(--text-dim);font-size:13px;line-height:1.6">
+          - Use HTTPS or localhost for camera permissions.<br>
+          - If switching cameras fails, we stop tracks then request a new stream.<br>
+          - Some devices limit FPS or resolution; “Auto” picks a workable profile.<br>
+          - Mic access prompts will appear only when audio is enabled.
+        </p>
+      </div>
+    </aside>
+  </main>
+
+  <div class="footer">© 2025 • Live Camera Stream UI. No external dependencies.</div>
+
+<script>
+  // Theme
+  const root = document.documentElement;
+  const themeBtn = document.getElementById('themeBtn');
+  const savedTheme = localStorage.getItem('theme');
+  if(savedTheme){ root.setAttribute('data-theme', savedTheme); }
+  themeBtn.addEventListener('click', ()=>{
+    const next = (root.getAttribute('data-theme') === 'light') ? '' : 'light';
+    if(next){ root.setAttribute('data-theme', next); }
+    else { root.removeAttribute('data-theme'); }
+    localStorage.setItem('theme', next);
+  });
+
+  // Elements
+  const video = document.getElementById('video');
+  const canvas = document.getElementById('canvas');
+  const deviceSelect = document.getElementById('deviceSelect');
+  const resSelect = document.getElementById('resSelect');
+  const startBtn = document.getElementById('startBtn');
+  const stopBtn = document.getElementById('stopBtn');
+  const switchBtn = document.getElementById('switchBtn');
+  const applyBtn = document.getElementById('applyBtn');
+  const toggleMicBtn = document.getElementById('toggleMicBtn');
+  const toggleMuteVideoBtn = document.getElementById('toggleMuteVideoBtn');
+  const zoomRange = document.getElementById('zoomRange');
+  const gridToggle = document.getElementById('gridToggle');
+  const mirrorToggle = document.getElementById('mirrorToggle');
+  const pipBtn = document.getElementById('pipBtn');
+  const fsBtn = document.getElementById('fsBtn');
+  const snapBtn = document.getElementById('snapBtn');
+  const recordBtn = document.getElementById('recordBtn');
+  const downloadBtn = document.getElementById('downloadBtn');
+  const grid = document.getElementById('grid');
+  const statRes = document.getElementById('statRes');
+  const statFps = document.getElementById('statFps');
+  const statFacing = document.getElementById('statFacing');
+  const statMic = document.getElementById('statMic');
+  const recordingBadge = document.getElementById('recordingBadge');
+  const videoWrap = document.getElementById('videoWrap');
+
+  // State
+  let currentStream = null;
+  let audioEnabled = false;
+  let facingMode = 'user'; // 'user' | 'environment'
+  let mediaRecorder = null;
+  let recordedChunks = [];
+  let fpsMeasureHandle = null;
+  let lastFrameTime = 0;
+
+  // Helpers
+  function stopStream(stream){
+    if(!stream) return;
+    stream.getTracks().forEach(t => t.stop());
+  }
+
+  function updateStats(){
+    const vTrack = currentStream?.getVideoTracks?.()[0];
+    const aTrack = currentStream?.getAudioTracks?.()[0];
+    if(vTrack){
+      const s = vTrack.getSettings?.() || {};
+      statRes.textContent = `Res: ${s.width || '–'}x${s.height || '–'}`;
+      statFacing.textContent = `Facing: ${s.facingMode || facingMode}`;
+    } else {
+      statRes.textContent = 'Res: –';
+      statFacing.textContent = 'Facing: –';
+    }
+    statMic.textContent = `Mic: ${aTrack && aTrack.enabled ? 'on' : 'off'}`;
+  }
+
+  function measureFPS(){
+    cancelAnimationFrame(fpsMeasureHandle);
+    let frames = 0;
+    let lastTS = performance.now();
+    function loop(ts){
+      frames++;
+      if(ts - lastTS >= 1000){
+        statFps.textContent = `FPS: ${frames}`;
+        frames = 0; lastTS = ts;
+      }
+      fpsMeasureHandle = requestAnimationFrame(loop);
+    }
+    fpsMeasureHandle = requestAnimationFrame(loop);
+  }
+
+  async function listDevices(){
+    try{
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const cams = devices.filter(d => d.kind === 'videoinput');
+      deviceSelect.innerHTML = '';
+      cams.forEach((d,i)=>{
+        const opt = document.createElement('option');
+        opt.value = d.deviceId;
+        opt.textContent = d.label || `Camera ${i+1}`;
+        deviceSelect.appendChild(opt);
+      });
+      // Keep currently selected if exists
+      if(!cams.length){
+        const opt = document.createElement('option');
+        opt.textContent = 'No cameras found';
+        deviceSelect.appendChild(opt);
+      }
+    }catch(e){
+      console.error('enumerateDevices failed', e);
+    }
+  }
+
+  function buildConstraints(deviceId, facing, quality, withAudio){
+    let videoCtr = {};
+    if(quality === 'hd'){ videoCtr = { width: {ideal:1280}, height:{ideal:720} }; }
+    else if(quality === 'fhd'){ videoCtr = { width: {ideal:1920}, height:{ideal:1080} }; }
+    else { videoCtr = { width: {ideal:1280}, height:{ideal:720} }; } // auto baseline
+
+    if(deviceId && deviceId !== 'default'){
+      videoCtr.deviceId = { exact: deviceId };
+    } else {
+      videoCtr.facingMode = { ideal: facing };
+    }
+
+    return {
+      audio: withAudio ? { echoCancellation:true, noiseSuppression:true, autoGainControl:true } : false,
+      video: videoCtr
+    };
+  }
+
+  async function startCamera(){
+    try{
+      stopCamera();
+      const deviceId = deviceSelect.value || 'default';
+      const constraints = buildConstraints(deviceId, facingMode, resSelect.value, audioEnabled);
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      currentStream = stream;
+      video.srcObject = stream;
+      await video.play().catch(()=>{});
+      updateStats();
+      measureFPS();
+      await listDevices(); // refresh labels once permission granted
+    }catch(e){
+      console.error('startCamera error', e);
+      alert('Failed to start camera. Check permissions and HTTPS.');
+    }
+  }
+
+  function stopCamera(){
+    cancelAnimationFrame(fpsMeasureHandle);
+    if(document.pictureInPictureElement) document.exitPictureInPicture().catch(()=>{});
+    stopStream(currentStream);
+    currentStream = null;
+    video.srcObject = null;
+    statRes.textContent = 'Res: –';
+    statFps.textContent = 'FPS: –';
+    statFacing.textContent = 'Facing: –';
+  }
+
+  async function switchFacing(){
+    facingMode = (facingMode === 'user') ? 'environment' : 'user';
+    await startCamera();
+  }
+
+  // UI bindings
+  startBtn.addEventListener('click', startCamera);
+  stopBtn.addEventListener('click', stopCamera);
+  switchBtn.addEventListener('click', switchFacing);
+  applyBtn.addEventListener('click', startCamera);
+
+  toggleMicBtn.addEventListener('click', async ()=>{
+    audioEnabled = !audioEnabled;
+    toggleMicBtn.textContent = `Mic: ${audioEnabled ? 'On' : 'Off'}`;
+    if(currentStream){
+      // Toggle existing audio track if present; else restart to add/remove audio
+      const a = currentStream.getAudioTracks()[0];
+      if(a){ a.enabled = audioEnabled; } else { await startCamera(); }
+    }
+    updateStats();
+  });
+
+  toggleMuteVideoBtn.addEventListener('click', ()=>{
+    const v = currentStream?.getVideoTracks?.()[0];
+    if(!v) return;
+    v.enabled = !v.enabled;
+    toggleMuteVideoBtn.textContent = `Video: ${v.enabled ? 'On' : 'Off'}`;
+  });
+
+  zoomRange.addEventListener('input', ()=>{
+    const z = parseFloat(zoomRange.value);
+    // CSS digital zoom
+    video.style.transform = `scale(${z}) ${mirrorToggle.checked ? 'scaleX(-1)' : ''}`;
+  });
+
+  gridToggle.addEventListener('change', ()=>{
+    grid.style.display = gridToggle.checked ? 'block' : 'none';
+  });
+
+  mirrorToggle.addEventListener('change', ()=>{
+    const z = parseFloat(zoomRange.value);
+    video.style.transform = `scale(${z}) ${mirrorToggle.checked ? 'scaleX(-1)' : ''}`;
+  });
+
+  pipBtn.addEventListener('click', async ()=>{
+    try{
+      if(document.pictureInPictureElement){
+        await document.exitPictureInPicture();
+      } else if(document.pictureInPictureEnabled && video.readyState >= 2){
+        await video.requestPictureInPicture();
+      }
+    }catch(e){ console.warn('PiP failed', e); }
+  });
+
+  fsBtn.addEventListener('click', ()=>{
+    if(!document.fullscreenElement){
+      videoWrap.requestFullscreen?.();
+    }else{
+      document.exitFullscreen?.();
+    }
+  });
+
+  snapBtn.addEventListener('click', ()=>{
+    if(!currentStream){ return; }
+    const track = currentStream.getVideoTracks()[0];
+    if(!track) return;
+    const settings = track.getSettings?.() || {};
+    const w = settings.width || video.videoWidth || 1280;
+    const h = settings.height || video.videoHeight || 720;
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext('2d');
+
+    // Mirror-aware snapshot
+    if(mirrorToggle.checked){
+      ctx.translate(w, 0);
+      ctx.scale(-1, 1);
+    }
+    ctx.drawImage(video, 0, 0, w, h);
+
+    // Optional: draw grid overlay onto snapshot if enabled
+    if(gridToggle.checked){
+      ctx.save();
+      ctx.globalAlpha = 0.35;
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(w/3, 0); ctx.lineTo(w/3, h);
+      ctx.moveTo((2*w)/3, 0); ctx.lineTo((2*w)/3, h);
+      ctx.moveTo(0, h/3); ctx.lineTo(w, h/3);
+      ctx.moveTo(0, (2*h)/3); ctx.lineTo(w, (2*h)/3);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Download snapshot
+    canvas.toBlob(blob=>{
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `snapshot-${Date.now()}.png`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }, 'image/png');
+  });
+
+  recordBtn.addEventListener('click', ()=>{
+    if(!mediaRecorder){
+      if(!currentStream){ return; }
+      // Record video+audio if present
+      const recStream = new MediaStream();
+      const v = currentStream.getVideoTracks()[0];
+      if(v) recStream.addTrack(v);
+      const a = currentStream.getAudioTracks()[0];
+      if(a && a.enabled) recStream.addTrack(a);
+      try{
+        mediaRecorder = new MediaRecorder(recStream, { mimeType: 'video/webm;codecs=vp9,opus' });
+      }catch{
+        mediaRecorder = new MediaRecorder(recStream, { mimeType: 'video/webm;codecs=vp8,opus' });
+      }
+      recordedChunks = [];
+      mediaRecorder.ondataavailable = e=>{ if(e.data.size>0) recordedChunks.push(e.data); };
+      mediaRecorder.onstop = ()=>{
+        recordingBadge.style.display = 'none';
+        const blob = new Blob(recordedChunks, { type: recordedChunks[0]?.type || 'video/webm' });
+        const url = URL.createObjectURL(blob);
+        downloadBtn.disabled = false;
+        downloadBtn.onclick = ()=>{
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `recording-${Date.now()}.webm`;
+          a.click();
+          URL.revokeObjectURL(url);
+        };
+      };
+      mediaRecorder.start(250);
+      recordBtn.textContent = 'Stop Recording';
+      recordingBadge.style.display = '';
+    } else {
+      mediaRecorder.stop();
+      mediaRecorder = null;
+      recordBtn.textContent = 'Start Recording';
+    }
+  });
+
+  // Start with mirrored preview
+  video.style.transform = 'scale(1) scaleX(-1)';
+
+  // Initialize device list after a permissions prompt; fallback try
+  (async ()=>{
+    try{
+      // Trigger a minimal permission prompt so labels populate
+      const tmp = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      stopStream(tmp);
+    }catch{}
+    await listDevices();
+  })();
+
+  // Update stats when track settings change (some browsers support onended/overconstrained events)
+  video.addEventListener('loadedmetadata', updateStats);
+
+  // Warn on unload to release camera
+  window.addEventListener('beforeunload', ()=> stopCamera());
+</script>
+</body>
+</html>

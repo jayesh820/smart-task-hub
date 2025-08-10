@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Drag & Drop – Pro Playground (All Features)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+
+  <style>
+    :root{
+      --bg1:#0f172a; --bg2:#1e293b; --ink:#e5e7eb; --muted:#94a3b8;
+      --accent:#7c3aed; --accent2:#06b6d4; --ok:#22c55e; --warn:#f59e0b; --err:#ef4444;
+      --stage:#0b1220; --stageBorder:rgba(255,255,255,.12);
+      --glass:rgba(255,255,255,.06); --line:rgba(255,255,255,.12);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;height:100%}
+    body{
+      font-family: Inter, system-ui, Segoe UI, Roboto, Arial, sans-serif;
+      background: linear-gradient(135deg, var(--bg1), var(--bg2));
+      color: var(--ink);
+      display:flex; flex-direction:column;
+    }
+
+    .topbar{
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
+      padding:12px 16px; border-bottom:1px solid var(--line);
+      background:linear-gradient(90deg, rgba(124,58,237,.15), rgba(6,182,212,.1));
+    }
+    .brand{display:flex; align-items:center; gap:10px; font-weight:900}
+    .logo{
+      width:36px; height:36px; display:grid; place-items:center; border-radius:10px;
+      background:linear-gradient(45deg, var(--accent), var(--accent2));
+      box-shadow:0 10px 25px rgba(124,58,237,.35);
+    }
+    .controls{display:flex; gap:8px; flex-wrap:wrap}
+    .btn{
+      border:none; border-radius:10px; padding:10px 12px; font-weight:800; cursor:pointer;
+      color:#0b1220; background:linear-gradient(45deg,#f8fafc,#e2e8f0);
+      transition:transform .12s ease, box-shadow .2s ease; display:inline-flex; align-items:center; gap:8px;
+    }
+    .btn:hover{transform:translateY(-1px); box-shadow:0 8px 20px rgba(0,0,0,.2)}
+    .btn.ghost{background:transparent; color:var(--ink); border:1px solid var(--line)}
+    .btn.accent{background:linear-gradient(45deg,var(--accent),#5b21b6); color:#fff}
+    .btn.ok{background:linear-gradient(45deg,var(--ok),#16a34a); color:#fff}
+    .btn.warn{background:linear-gradient(45deg,var(--warn),#b45309); color:#fff}
+    .btn.err{background:linear-gradient(45deg,var(--err),#b91c1c); color:#fff}
+
+    .panel{
+      display:flex; gap:12px; align-items:center; flex-wrap:wrap;
+      padding:10px 16px; color:var(--muted);
+      border-bottom:1px solid var(--line);
+      background:rgba(255,255,255,.02);
+    }
+    .switch{display:flex; gap:8px; align-items:center}
+    .chip{padding:6px 10px; border-radius:999px; background:var(--glass); color:#cbd5e1; font-weight:800; font-size:.85rem}
+
+    .wrap{flex:1; display:flex; align-items:center; justify-content:center; padding:14px}
+    .stage{
+      width:min(96vw, 1100px);
+      height:min(78vh, 640px);
+      background:var(--stage);
+      border:2px dashed var(--stageBorder);
+      border-radius:16px;
+      position:relative;
+      box-shadow:0 30px 80px rgba(0,0,0,.35);
+      overflow:hidden;
+    }
+
+    .grid-bg{
+      position:absolute; inset:0; pointer-events:none;
+      background:
+        linear-gradient(to right, rgba(255,255,255,.05) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255,255,255,.05) 1px, transparent 1px);
+      background-size: 20px 20px;
+    }
+
+    .guide{
+      position:absolute; background:rgba(6,182,212,.35);
+      box-shadow:0 0 0 1px rgba(6,182,212,.6) inset;
+      pointer-events:none;
+    }
+    .guide.h{height:2px; left:0; right:0}
+    .guide.v{width:2px; top:0; bottom:0}
+
+    .card{
+      position:absolute; width:200px; height:130px;
+      background:linear-gradient(135deg, rgba(124,58,237,.9), rgba(6,182,212,.85));
+      color:#fff; border-radius:14px; box-shadow:0 10px 28px rgba(0,0,0,.35);
+      user-select:none; cursor:grab; display:flex; flex-direction:column;
+      transition: box-shadow .12s ease, transform .06s ease;
+      touch-action:none; /* Prevent touch gestures interfering */
+    }
+    .card.dragging{cursor:grabbing; transform:scale(1.02); box-shadow:0 18px 40px rgba(0,0,0,.4)}
+    .card .head{
+      display:flex; align-items:center; justify-content:space-between; padding:8px 10px; font-weight:900; background:rgba(0,0,0,.12);
+      border-top-left-radius:14px; border-top-right-radius:14px; font-size:.95rem;
+    }
+    .card .body{flex:1; display:grid; place-items:center; font-weight:800; letter-spacing:.3px}
+
+    .status{
+      position:absolute; bottom:10px; left:10px; right:10px;
+      display:flex; gap:8px; flex-wrap:wrap; pointer-events:none;
+    }
+    .pill{padding:6px 10px; border-radius:999px; background:var(--glass); color:#e5e7eb; font-weight:800; font-size:.84rem}
+
+    /* Light theme override */
+    .light body{color:#0b1220}
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand">
+      <div class="logo"><i class="fa-solid fa-arrows-up-down-left-right"></i></div>
+      <div>Drag & Drop – Pro Playground</div>
+    </div>
+    <div class="controls">
+      <button id="btnAdd" class="btn ok"><i class="fa-solid fa-plus"></i> Add</button>
+      <button id="btnDuplicate" class="btn"><i class="fa-solid fa-clone"></i> Duplicate</button>
+      <button id="btnDelete" class="btn err"><i class="fa-solid fa-trash"></i> Delete</button>
+      <button id="btnReset" class="btn warn"><i class="fa-solid fa-rotate"></i> Reset</button>
+      <button id="btnSave" class="btn accent"><i class="fa-solid fa-floppy-disk"></i> Save</button>
+      <button id="btnLoad" class="btn ghost"><i class="fa-solid fa-download"></i> Load</button>
+      <button id="btnTheme" class="btn ghost"><i class="fa-solid fa-moon"></i> Theme</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <span class="chip"><i class="fa-regular fa-keyboard"></i> Arrows=nudge • Del=delete • Ctrl/Cmd+D=duplicate</span>
+    <label class="switch">
+      <input id="snap" type="checkbox" />
+      <span>Snap to grid (20px)</span>
+    </label>
+    <label class="switch">
+      <input id="magnet" type="checkbox" checked />
+      <span>Magnet guides (center/edges)</span>
+    </label>
+  </div>
+
+  <div class="wrap">
+    <div class="stage" id="stage">
+      <div class="grid-bg" aria-hidden="true"></div>
+
+      <!-- Guides -->
+      <div id="guideH" class="guide h" style="display:none"></div>
+      <div id="guideV" class="guide v" style="display:none"></div>
+
+      <!-- Initial cards -->
+      <div class="card" data-id="1" style="left:24px; top:24px; z-index:1">
+        <div class="head"><span>Card 1</span><span style="opacity:.8">drag me</span></div>
+        <div class="body">Hello</div>
+      </div>
+      <div class="card" data-id="2" style="left:260px; top:140px; z-index:2">
+        <div class="head"><span>Card 2</span><span style="opacity:.8">drag me</span></div>
+        <div class="body">World</div>
+      </div>
+
+      <div class="status" id="status"></div>
+    </div>
+  </div>
+
+  <script>
+    (function(){
+      const stage = document.getElementById('stage');
+      const guideH = document.getElementById('guideH');
+      const guideV = document.getElementById('guideV');
+      const statusBar = document.getElementById('status');
+
+      const btnAdd = document.getElementById('btnAdd');
+      const btnDuplicate = document.getElementById('btnDuplicate');
+      const btnDelete = document.getElementById('btnDelete');
+      const btnReset = document.getElementById('btnReset');
+      const btnSave = document.getElementById('btnSave');
+      const btnLoad = document.getElementById('btnLoad');
+      const btnTheme = document.getElementById('btnTheme');
+
+      const snapBox = document.getElementById('snap');
+      const magnetBox = document.getElementById('magnet');
+
+      const GRID = 20;
+      const MAGNET_TOL = 8;
+
+      let dragging = null;
+      let startX=0, startY=0, startLeft=0, startTop=0;
+      let zTop = 10;
+      let selected = null;
+      let idSeq = 3;
+      let dark = true;
+
+      function clamp(v, min, max){ return Math.max(min, Math.min(max, v)); }
+      function snap(v){ return Math.round(v / GRID) * GRID; }
+      function boundsFor(el){
+        const maxLeft = stage.clientWidth - el.offsetWidth;
+        const maxTop  = stage.clientHeight - el.offsetHeight;
+        return { maxLeft, maxTop };
+      }
+      function toast(msg){
+        const pill = document.createElement('div');
+        pill.className='pill'; pill.textContent = msg;
+        statusBar.appendChild(pill);
+        setTimeout(()=> pill.remove(), 1200);
+      }
+      function setSelected(el){
+        selected?.classList?.remove('dragging');
+        selected = el || null;
+        if (selected){
+          zTop += 1;
+          selected.style.zIndex = String(zTop);
+        }
+      }
+
+      function showGuides(x, y){
+        if (!magnetBox.checked){ guideH.style.display='none'; guideV.style.display='none'; return; }
+        if (typeof y==='number'){
+          guideH.style.display='block'; guideH.style.top = y+'px';
+        } else guideH.style.display='none';
+        if (typeof x==='number'){
+          guideV.style.display='block'; guideV.style.left = x+'px';
+        } else guideV.style.display='none';
+      }
+      function hideGuides(){ guideH.style.display='none'; guideV.style.display='none'; }
+
+      function nearestMagnets(el, left, top){
+        if (!magnetBox.checked) return { left, top };
+        const stageW = stage.clientWidth, stageH = stage.clientHeight;
+        const w = el.offsetWidth, h = el.offsetHeight;
+        const centerX = stageW/2 - w/2, centerY = stageH/2 - h/2;
+
+        let snapX = left, snapY = top;
+        let guideX = null, guideY = null;
+
+        const candidatesX = [0, centerX, stageW - w];
+        const candidatesY = [0, centerY, stageH - h];
+
+        candidatesX.forEach(cx => {
+          if (Math.abs(left - cx) <= MAGNET_TOL){ snapX = cx; guideX = cx + w/2; }
+        });
+        candidatesY.forEach(cy => {
+          if (Math.abs(top - cy) <= MAGNET_TOL){ snapY = cy; guideY = cy + h/2; }
+        });
+
+        showGuides(guideX, guideY);
+        return { left: snapX, top: snapY };
+      }
+
+      function onDown(e){
+        const target = e.target.closest('.card');
+        if (!target || !stage.contains(target)) return;
+
+        dragging = target;
+        setSelected(target);
+        dragging.classList.add('dragging');
+
+        const p = (e.touches ? e.touches : e);
+        startX = p.clientX; startY = p.clientY;
+        startLeft = parseFloat(dragging.style.left || 0);
+        startTop  = parseFloat(dragging.style.top || 0);
+
+        e.preventDefault();
+      }
+
+      function onMove(e){
+        if (!dragging) return;
+        const p = (e.touches ? e.touches : e);
+        const dx = p.clientX - startX;
+        const dy = p.clientY - startY;
+
+        const { maxLeft, maxTop } = boundsFor(dragging);
+        let newLeft = clamp(startLeft + dx, 0, maxLeft);
+        let newTop  = clamp(startTop  + dy, 0, maxTop);
+
+        if (snapBox.checked){ newLeft = snap(newLeft); newTop = snap(newTop); }
+
+        const m = nearestMagnets(dragging, newLeft, newTop);
+        newLeft = m.left; newTop = m.top;
+
+        dragging.style.left = newLeft + 'px';
+        dragging.style.top  = newTop + 'px';
+
+        e.preventDefault();
+      }
+
+      function onUp(){
+        if (!dragging) return;
+        dragging.classList.remove('dragging');
+        dragging = null;
+        hideGuides();
+      }
+
+      function addCard(x=24, y=24, title){
+        const el = document.createElement('div');
+        el.className = 'card';
+        el.dataset.id = String(idSeq++);
+        el.style.left = x + 'px';
+        el.style.top = y + 'px';
+        el.style.zIndex = String(++zTop);
+        el.innerHTML = `
+          <div class="head"><span>${title || 'Card ' + el.dataset.id}</span><span style="opacity:.8">drag me</span></div>
+          <div class="body">New</div>
+        `;
+        stage.appendChild(el);
+        setSelected(el);
+        toast('Card added');
+        return el;
+      }
+
+      function duplicateSelected(){
+        if (!selected) return toast('No card selected');
+        const left = parseFloat(selected.style.left || 0);
+        const top  = parseFloat(selected.style.top || 0);
+        const title = selected.querySelector('.head span')?.textContent || 'Card';
+        const bodyText = selected.querySelector('.body')?.textContent || '';
+        const copy = addCard(left + 20, top + 20, title + ' (copy)');
+        copy.querySelector('.body').textContent = bodyText;
+      }
+
+      function deleteSelected(){
+        if (!selected) return toast('No card selected');
+        selected.remove();
+        selected = null;
+        toast('Deleted');
+      }
+
+      function resetAll(){
+        stage.querySelectorAll('.card').forEach((c,i)=>{
+          c.style.left = (24 + i*40) + 'px';
+          c.style.top  = (24 + i*24) + 'px';
+          c.style.zIndex = String(i+1);
+        });
+        zTop = 10;
+        toast('Reset');
+      }
+
+      function snapshot(){
+        return {
+          cards: [...stage.querySelectorAll('.card')].map(el => ({
+            id: el.dataset.id,
+            left: parseFloat(el.style.left || 0),
+            top: parseFloat(el.style.top || 0),
+            z: parseInt(el.style.zIndex || '1', 10),
+            title: el.querySelector('.head span')?.textContent || '',
+            body: el.querySelector('.body')?.textContent || ''
+          }))
+        };
+      }
+      function restore(data){
+        stage.querySelectorAll('.card').forEach(c => c.remove());
+        (data.cards || []).forEach(c => {
+          const el = addCard(c.left, c.top, c.title);
+          el.querySelector('.body').textContent = c.body || '';
+          el.style.zIndex = String(c.z || ++zTop);
+        });
+      }
+      function saveLayout(){
+        localStorage.setItem('dragLayout', JSON.stringify(snapshot()));
+        toast('Saved');
+      }
+      function loadLayout(){
+        const raw = localStorage.getItem('dragLayout');
+        if (!raw) return toast('No saved layout');
+        try{ restore(JSON.parse(raw)); toast('Loaded'); }catch{ toast('Load failed'); }
+      }
+
+      // Keyboard
+      window.addEventListener('keydown', (e)=>{
+        if (!selected) return;
+
+        // Duplicate
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase()==='d'){
+          e.preventDefault();
+          duplicateSelected();
+          return;
+        }
+        // Delete
+        if (e.key==='Delete' || e.key==='Backspace'){
+          e.preventDefault();
+          deleteSelected();
+          return;
+        }
+
+        // Nudge with arrows
+        const step = e.shiftKey ? 10 : 2;
+        const { maxLeft, maxTop } = boundsFor(selected);
+        let left = parseFloat(selected.style.left || 0);
+        let top  = parseFloat(selected.style.top || 0);
+        let moved = false;
+
+        if (e.key==='ArrowLeft'){ left = clamp(left - step, 0, maxLeft); moved = true; }
+        if (e.key==='ArrowRight'){ left = clamp(left + step, 0, maxLeft); moved = true; }
+        if (e.key==='ArrowUp'){ top = clamp(top - step, 0, maxTop); moved = true; }
+        if (e.key==='ArrowDown'){ top = clamp(top + step, 0, maxTop); moved = true; }
+
+        if (moved){
+          if (snapBox.checked){ left = snap(left); top = snap(top); }
+          const m = nearestMagnets(selected, left, top);
+          selected.style.left = m.left + 'px';
+          selected.style.top  = m.top + 'px';
+          // Quick guide flicker
+          showGuides(m.left + selected.offsetWidth/2, m.top + selected.offsetHeight/2);
+          clearTimeout(selected._keyGuideTimer);
+          selected._keyGuideTimer = setTimeout(hideGuides, 300);
+          e.preventDefault();
+        }
+      });
+
+      // Pointer events
+      stage.addEventListener('mousedown', onDown);
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+
+      // Touch events
+      stage.addEventListener('touchstart', onDown, { passive:false });
+      document.addEventListener('touchmove', onMove, { passive:false });
+      document.addEventListener('touchend', onUp);
+
+      // Select on click
+      stage.addEventListener('click', (e)=>{
+        const card = e.target.closest('.card');
+        if (card) setSelected(card);
+      });
+
+      // Buttons
+      btnAdd.addEventListener('click', ()=> addCard(24 + Math.random()*220, 24 + Math.random()*140));
+      btnDuplicate.addEventListener('click', duplicateSelected);
+      btnDelete.addEventListener('click', deleteSelected);
+      btnReset.addEventListener('click', resetAll);
+      btnSave.addEventListener('click', saveLayout);
+      btnLoad.addEventListener('click', loadLayout);
+
+      // Theme toggle
+      btnTheme.addEventListener('click', ()=>{
+        dark = !dark;
+        document.body.style.background = dark
+          ? 'linear-gradient(135deg,#0f172a,#1e293b)'
+          : 'linear-gradient(135deg,#f4f7fb,#e6eef8)';
+      });
+
+      // Deselect when clicking empty area in stage
+      stage.addEventListener('mousedown', (e)=>{
+        if (!e.target.closest('.card')) setSelected(null);
+      });
+
+      // Keep inside on resize
+      window.addEventListener('resize', ()=>{
+        stage.querySelectorAll('.card').forEach(el=>{
+          const { maxLeft, maxTop } = boundsFor(el);
+          const left = clamp(parseFloat(el.style.left || 0), 0, maxLeft);
+          const top  = clamp(parseFloat(el.style.top || 0), 0, maxTop);
+          el.style.left = left + 'px';
+          el.style.top  = top + 'px';
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

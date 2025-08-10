@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <title>Voice → ChatGPT (Mic Input)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+  <style>
+    :root{
+      --bg1:#0f172a; --bg2:#1e293b; --card:#0b1220; --ink:#e5e7eb; --muted:#94a3b8;
+      --accent:#7c3aed; --accent2:#06b6d4; --ok:#22c55e; --warn:#f59e0b; --err:#ef4444; --line:rgba(255,255,255,.12);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;height:100%}
+    body{
+      font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif;
+      background:linear-gradient(135deg,var(--bg1),var(--bg2));
+      color:var(--ink); display:flex; align-items:center; justify-content:center; padding:16px;
+    }
+    .app{width:min(100%, 1100px); background:rgba(255,255,255,.05); border:1px solid var(--line);
+      border-radius:16px; overflow:hidden; box-shadow:0 30px 80px rgba(0,0,0,.35)}
+    .top{
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
+      padding:12px 16px; border-bottom:1px solid var(--line);
+      background:linear-gradient(90deg, rgba(124,58,237,.15), rgba(6,182,212,.12));
+    }
+    .brand{display:flex; gap:10px; align-items:center; font-weight:900}
+    .logo{width:36px; height:36px; display:grid; place-items:center; border-radius:10px;
+      background:linear-gradient(45deg,var(--accent),var(--accent2))}
+    .panel{display:grid; grid-template-columns: 1fr; gap:14px; padding:16px}
+    .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+    .card{
+      background:linear-gradient(180deg, rgba(17,24,39,.78), rgba(2,6,23,.78));
+      border:1px solid var(--line); border-radius:12px; padding:14px
+    }
+    textarea, input{
+      width:100%; background:#0b1220; color:#fff; border:2px solid #101827;
+      border-radius:10px; padding:12px; font-size:1rem; outline:none;
+      transition:border-color .15s ease, box-shadow .15s ease;
+    }
+    textarea:focus, input:focus{border-color:#06b6d4; box-shadow:0 0 0 3px rgba(6,182,212,.15)}
+    .btn{
+      border:none; border-radius:10px; padding:10px 12px; font-weight:800; cursor:pointer;
+      background:linear-gradient(45deg,#f8fafc,#e2e8f0); color:#0b1220;
+      transition:transform .1s ease, box-shadow .2s ease; display:inline-flex; align-items:center; gap:8px;
+    }
+    .btn:hover{transform:translateY(-1px); box-shadow:0 10px 18px rgba(0,0,0,.2)}
+    .btn.accent{background:linear-gradient(45deg,#7c3aed,#5b21b6); color:#fff}
+    .btn.ok{background:linear-gradient(45deg,#22c55e,#16a34a); color:#fff}
+    .btn.err{background:linear-gradient(45deg,#ef4444,#b91c1c); color:#fff}
+    .btn.ghost{background:transparent; color:#e5e7eb; border:1px solid var(--line)}
+    .small{color:var(--muted); font-size:.9rem}
+    .status{
+      padding:10px 12px; border-radius:10px; font-weight:800; display:none
+    }
+    .status.info{background:rgba(6,182,212,.15); color:#a5f3fc; border:1px solid rgba(6,182,212,.25)}
+    .status.ok{background:rgba(34,197,94,.15); color:#bbf7d0; border:1px solid rgba(34,197,94,.25)}
+    .status.err{background:rgba(239,68,68,.15); color:#fecaca; border:1px solid rgba(239,68,68,.25)}
+    .mono{font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
+    .flex-between{display:flex; justify-content:space-between; align-items:center; gap:10px}
+    .shade{color:#cbd5e1}
+    .hl{color:#22d3ee}
+    .radio-group{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+    .radio{display:flex; align-items:center; gap:6px; padding:6px 10px; border:1px solid var(--line);
+      border-radius:999px; cursor:pointer}
+    .w100{width:100%}
+  </style>
+</head>
+<body>
+  <div class="app" id="app">
+    <div class="top">
+      <div class="brand">
+        <div class="logo"><i class="fa-solid fa-microphone"></i></div>
+        <div>Voice → ChatGPT</div>
+      </div>
+      <div class="row">
+        <button id="btnTheme" class="btn ghost"><i class="fa-solid fa-moon"></i> Theme</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <!-- Mic + Prompt card -->
+      <div class="card">
+        <div class="flex-between">
+          <div class="row">
+            <button id="btnStart" class="btn ok"><i class="fa-solid fa-circle-dot"></i> Start Mic</button>
+            <button id="btnStop" class="btn err" disabled><i class="fa-solid fa-square"></i> Stop</button>
+            <button id="btnClear" class="btn ghost"><i class="fa-solid fa-eraser"></i> Clear</button>
+          </div>
+          <div class="small">
+            <i class="fa-solid fa-info-circle"></i> Use Chrome/Edge for best speech recognition.
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:10px">
+          <div class="radio-group" id="langGroup" aria-label="Language">
+            <label class="radio"><input type="radio" name="lang" value="en-IN" checked> English (India)</label>
+            <label class="radio"><input type="radio" name="lang" value="hi-IN"> Hindi (India)</label>
+            <label class="radio"><input type="radio" name="lang" value="en-US"> English (US)</label>
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:10px">
+          <textarea id="prompt" rows="4" placeholder="Speak or type the prompt for ChatGPT..."></textarea>
+        </div>
+
+        <div id="recStatus" class="status info" role="status" style="margin-top:10px"></div>
+      </div>
+
+      <!-- API config -->
+      <div class="card">
+        <div class="flex-between">
+          <div class="small"><i class="fa-solid fa-shield-halved"></i> API Settings (use a backend proxy in production)</div>
+          <div class="radio-group">
+            <label class="radio"><input type="radio" name="provider" value="openai" checked> OpenAI-compatible</label>
+            <label class="radio"><input type="radio" name="provider" value="custom"> Custom</label>
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:10px">
+          <input id="apiUrl" placeholder="API URL (e.g., https://api.openai.com/v1/chat/completions or your proxy)"/>
+        </div>
+        <div class="row">
+          <input id="apiKey" placeholder="API Key (leave blank if your proxy handles auth)"/>
+        </div>
+        <div class="row">
+          <input id="model" value="gpt-3.5-turbo" placeholder="Model (e.g., gpt-4o-mini, gpt-4o, gpt-3.5-turbo)"/>
+        </div>
+        <div class="row">
+          <button id="btnSend" class="btn accent"><i class="fa-solid fa-paper-plane"></i> Send to ChatGPT</button>
+          <button id="btnStopStream" class="btn ghost" disabled><i class="fa-solid fa-ban"></i> Stop Stream</button>
+        </div>
+      </div>
+
+      <!-- Output -->
+      <div class="card">
+        <div class="flex-between">
+          <div class="row">
+            <div class="small"><i class="fa-solid fa-message"></i> Response</div>
+          </div>
+          <div class="row">
+            <button id="btnCopy" class="btn ghost"><i class="fa-solid fa-copy"></i> Copy</button>
+          </div>
+        </div>
+        <div id="output" class="mono" style="margin-top:10px; white-space:pre-wrap; min-height:140px"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ============== Speech Recognition (Web Speech API) ============
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let recog = null;
+    let recognizing = false;
+    let currentLang = 'en-IN';
+
+    const btnStart = document.getElementById('btnStart');
+    const btnStop = document.getElementById('btnStop');
+    const btnClear = document.getElementById('btnClear');
+    const promptEl = document.getElementById('prompt');
+    const recStatus = document.getElementById('recStatus');
+    const langGroup = document.getElementById('langGroup');
+
+    function showRecStatus(msg, kind='info'){
+      recStatus.textContent = msg;
+      recStatus.className = 'status ' + kind;
+      recStatus.style.display = 'block';
+    }
+    function hideRecStatus(){ recStatus.style.display = 'none'; }
+
+    function initRecognition(){
+      if (!SpeechRecognition){
+        showRecStatus('Speech Recognition not supported in this browser.', 'err');
+        btnStart.disabled = true;
+        return;
+      }
+      recog = new SpeechRecognition();
+      recog.lang = currentLang;
+      recog.interimResults = true;
+      recog.continuous = true;
+
+      let interim = '';
+
+      recog.onstart = () => {
+        recognizing = true;
+        btnStart.disabled = true;
+        btnStop.disabled = false;
+        showRecStatus('Listening... Speak now. Click Stop to finish.', 'info');
+      };
+      recog.onresult = (e) => {
+        interim = '';
+        for (let i = e.resultIndex; i < e.results.length; i++){
+          const t = e.results[i][0].transcript;
+          if (e.results[i].isFinal){
+            promptEl.value = (promptEl.value + ' ' + t).trim();
+          } else {
+            interim += t;
+          }
+        }
+        if (interim){
+          showRecStatus('Listening (interim): ' + interim, 'info');
+        }
+      };
+      recog.onerror = (e) => {
+        showRecStatus('Mic error: ' + (e.error || 'unknown'), 'err');
+      };
+      recog.onend = () => {
+        recognizing = false;
+        btnStart.disabled = false;
+        btnStop.disabled = true;
+        showRecStatus('Stopped listening.', 'ok');
+        setTimeout(hideRecStatus, 1200);
+      };
+    }
+    initRecognition();
+
+    langGroup.addEventListener('change', (e)=>{
+      const target = e.target;
+      if (target && target.name === 'lang'){
+        currentLang = target.value;
+        if (recognizing && recog){ try{ recog.stop(); }catch{} }
+        initRecognition();
+      }
+    });
+
+    btnStart.addEventListener('click', ()=>{
+      if (!recog){ initRecognition(); }
+      try{
+        recog.lang = currentLang;
+        recog.start();
+      }catch(e){
+        showRecStatus('Could not start mic: ' + e.message, 'err');
+      }
+    });
+
+    btnStop.addEventListener('click', ()=>{
+      try{ recog && recog.stop(); }catch{}
+    });
+
+    btnClear.addEventListener('click', ()=>{
+      promptEl.value = '';
+      hideRecStatus();
+    });
+
+    // ============== ChatGPT API (OpenAI-compatible) ================
+    const btnSend = document.getElementById('btnSend');
+    const btnStopStream = document.getElementById('btnStopStream');
+    const btnCopy = document.getElementById('btnCopy');
+    const output = document.getElementById('output');
+    const apiUrlEl = document.getElementById('apiUrl');
+    const apiKeyEl = document.getElementById('apiKey');
+    const modelEl = document.getElementById('model');
+    let abortCtrl = null;
+
+    // Sensible defaults for quick tests (replace with your proxy)
+    apiUrlEl.value = 'https://api.openai.com/v1/chat/completions'; // or your backend proxy
+    modelEl.value = 'gpt-3.5-turbo'; // change to your available model
+
+    async function streamChatCompletion({apiUrl, apiKey, model, messages}){
+      // For OpenAI chat/completions (legacy) streaming with "stream": true and SSE
+      // If using responses API or other providers, adjust payload and stream parsing.
+      abortCtrl = new AbortController();
+      const payload = {
+        model,
+        messages,
+        temperature: 0.7,
+        stream: true
+      };
+      const headers = { 'Content-Type':'application/json' };
+      if (apiKey) headers['Authorization'] = 'Bearer ' + apiKey;
+
+      const res = await fetch(apiUrl, {
+        method:'POST',
+        headers,
+        body: JSON.stringify(payload),
+        signal: abortCtrl.signal
+      });
+      if (!res.ok){
+        const text = await res.text().catch(()=> '');
+        throw new Error('API error: ' + res.status + ' ' + res.statusText + ' - ' + text);
+      }
+
+      // Parse SSE stream
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder('utf-8');
+      let buffer = '';
+      while(true){
+        const {value, done} = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, {stream:true});
+        const parts = buffer.split('\n\n');
+        buffer = parts.pop() || '';
+        for (const part of parts){
+          if (!part.startsWith('data:')) continue;
+          const data = part.replace(/^data:\s*/,'').trim();
+          if (data === '[DONE]'){ return; }
+          try{
+            const json = JSON.parse(data);
+            const delta = json.choices?.[0]?.delta?.content || '';
+            if (delta) output.textContent += delta;
+          }catch{}
+        }
+      }
+    }
+
+    btnSend.addEventListener('click', async ()=>{
+      const prompt = promptEl.value.trim();
+      if (!prompt){
+        output.textContent = 'Please speak or type a prompt first.';
+        return;
+      }
+      const apiUrl = apiUrlEl.value.trim();
+      const apiKey = apiKeyEl.value.trim();
+      const model = modelEl.value.trim() || 'gpt-3.5-turbo';
+      output.textContent = '';
+      btnSend.disabled = true;
+      btnStopStream.disabled = false;
+
+      try{
+        await streamChatCompletion({
+          apiUrl,
+          apiKey,
+          model,
+          messages: [
+            { role:'system', content: 'You are ChatGPT, a helpful AI assistant.' },
+            { role:'user', content: prompt }
+          ]
+        });
+      }catch(e){
+        output.textContent = 'Error: ' + (e.message || 'request failed');
+      }finally{
+        btnSend.disabled = false;
+        btnStopStream.disabled = true;
+        abortCtrl = null;
+      }
+    });
+
+    btnStopStream.addEventListener('click', ()=>{
+      if (abortCtrl){ abortCtrl.abort(); }
+    });
+
+    btnCopy.addEventListener('click', async ()=>{
+      try{
+        await navigator.clipboard.writeText(output.textContent);
+        showRecStatus('Copied response to clipboard.', 'ok');
+        setTimeout(hideRecStatus, 1200);
+      }catch{
+        showRecStatus('Copy failed.', 'err');
+      }
+    });
+
+    // ============== Theme Toggle =================
+    const btnTheme = document.getElementById('btnTheme');
+    let dark = true;
+    btnTheme.addEventListener('click', ()=>{
+      dark = !dark;
+      document.body.style.background = dark
+        ? 'linear-gradient(135deg,#0f172a,#1e293b)'
+        : 'linear-gradient(135deg,#f4f7fb,#e6eef8)';
+    });
+
+    // ============== Security & UX ================
+    window.addEventListener('beforeunload', ()=> {
+      if (recognizing && recog) { try{ recog.stop(); }catch{} }
+      if (abortCtrl) { abortCtrl.abort(); }
+    });
+  </script>
+</body>
+</html>
