@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Photo Capture + Email (JS)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+  <style>
+    body {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .container {
+      background: white;
+      border-radius: 20px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+      padding: 32px;
+      width: 100%;
+      max-width: 440px;
+      text-align: center;
+    }
+    .header {
+      margin-bottom: 18px;
+    }
+    .header h1 {
+      color: #333;
+      margin-bottom: 8px;
+      font-size: 2em;
+    }
+    .header p {
+      color: #666;
+    }
+    .video-box {
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 8px 24px rgba(80,50,160,.14);
+      position: relative;
+      margin-bottom: 16px;
+    }
+    video, canvas { width: 100%; max-width: 360px; height: 270px; display: block; }
+    #photo { margin-top: 10px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,.12); }
+    .controls { margin:16px 0; display: flex; gap: 8px; justify-content: center; }
+    .btn {
+      padding: 10px 18px;
+      border: none;
+      border-radius: 25px;
+      font-size: 1.05em;
+      font-weight: 600;
+      cursor: pointer;
+      background: linear-gradient(45deg, #4caf50, #45a049);
+      color: white;
+      display: flex; align-items: center; gap: 7px;
+      transition: box-shadow .18s, transform .13s;
+    }
+    .btn.secondary { background: linear-gradient(45deg,#ffd93d,#ffcd02); color:#222;}
+    .btn.accent { background: linear-gradient(45deg,#ff6b6b,#ee5a52);}
+    .btn:disabled { opacity: .65; cursor: not-allowed;}
+    .field { margin:10px 0; text-align:left;}
+    .field label { font-size:.98em; color:#333; display:block; margin-bottom: 4px;}
+    .field input, .field textarea {
+      width: 100%;
+      border: 1.5px solid #eee;
+      border-radius: 8px;
+      padding: 9px 11px;
+      font-size: 1em;
+      background:#f7f8fd;
+      margin-bottom:4px;
+    }
+    .status { margin:14px 0 0 0; padding:11px 14px; border-radius: 12px; font-weight:600;}
+    .success {background:#d4edda; color:#155724;}
+    .error {background:#f8d7da; color:#721c24;}
+    .info {background:#d1ecf1; color:#0c5460;}
+    .small {color:#666;font-size:.94em}
+
+    @media(max-width:544px) {
+      .container { padding:10px; margin:6px;}
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1><i class="fas fa-camera"></i> Snap & Email</h1>
+      <p>Capture a photo, then email it instantly!</p>
+    </div>
+    <div class="video-box">
+      <video id="video" autoplay playsinline poster="" style="background:#000;display:block;"></video>
+    </div>
+    <canvas id="canvas" width="360" height="270" style="display:none"></canvas>
+    <img id="photo" style="display:none" alt="Captured photo"/>
+    <div class="controls">
+      <button id="startCam" class="btn"><i class="fa-solid fa-video"></i> Start Camera</button>
+      <button id="capture" class="btn accent" style="display:none;"><i class="fa-solid fa-camera"></i> Capture</button>
+      <button id="retake" class="btn secondary" style="display:none;"><i class="fa-solid fa-redo"></i> Retake</button>
+    </div>
+    <div id="emailForm" style="display:none;margin-top:14px;">
+      <div class="field">
+        <label for="toEmail">To Email</label>
+        <input type="email" id="toEmail" required placeholder="recipient@example.com"/>
+      </div>
+      <div class="field">
+        <label for="userName">Your Name</label>
+        <input type="text" id="userName" required placeholder="Your Name"/>
+      </div>
+      <div class="field">
+        <label for="userEmail">Your Email</label>
+        <input type="email" id="userEmail" required placeholder="your@email.com"/>
+      </div>
+      <div class="field">
+        <label for="message">Message</label>
+        <textarea id="message" rows="2" placeholder="Write a message..."></textarea>
+      </div>
+      <button id="sendEmail" class="btn"><i class="fa-solid fa-paper-plane"></i> Send Email</button>
+    </div>
+    <div id="status" class="status info small" style="display:none"></div>
+    <div class="small" style="margin-top:10px;">Photo sent as image attachment via the API you configure.</div>
+  </div>
+
+  <script>
+    // Configuration for EmailJS (get these from emailjs.com dashboard)
+    const EMAILJS_PUBLIC = 'YOUR_PUBLIC_KEY';    // set your key
+    const EMAILJS_SERVICE = 'YOUR_SERVICE_ID';
+    const EMAILJS_TEMPLATE = 'YOUR_TEMPLATE_ID';
+
+    if (window.emailjs && EMAILJS_PUBLIC) {
+      emailjs.init({publicKey:EMAILJS_PUBLIC});
+    }
+
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const photo = document.getElementById('photo');
+    const startBtn = document.getElementById('startCam');
+    const captureBtn = document.getElementById('capture');
+    const retakeBtn = document.getElementById('retake');
+    const form = document.getElementById('emailForm');
+    const sendBtn = document.getElementById('sendEmail');
+    const status = document.getElementById('status');
+    let stream = null, imageData = null;
+
+    function show(el){ el.style.display='block'; }
+    function hide(el){ el.style.display='none'; }
+    function msg(text, kind) {
+      status.className = 'status ' + (kind||'info');
+      status.textContent = text;
+      status.style.display = 'block';
+    }
+    function hideMsg(){ status.style.display = 'none'; }
+
+    startBtn.onclick = async ()=>{
+      try{
+        stream = await navigator.mediaDevices.getUserMedia({video:true});
+        video.srcObject = stream;
+        startBtn.style.display='none';
+        show(captureBtn);
+        msg('Camera ready. Click capture!', 'success');
+      }catch(_){
+        msg('Could not open camera. Allow permissions!', 'error');
+      }
+    };
+
+    captureBtn.onclick = ()=>{
+      hideMsg();
+      canvas.width = video.videoWidth || 360;
+      canvas.height = video.videoHeight || 270;
+      canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+      imageData = canvas.toDataURL('image/png');
+      photo.src = imageData;
+      show(photo);
+      captureBtn.style.display='none';
+      show(retakeBtn);
+      show(form);
+      // stop video feed
+      stream.getTracks().forEach(t=>t.stop());
+      video.srcObject = null;
+      msg('Captured! Fill form and send.', 'success');
+    };
+
+    retakeBtn.onclick = ()=>{
+      hide(photo); hide(form); hide(retakeBtn); show(captureBtn);
+      startBtn.style.display='none';
+      video.srcObject = null;
+      navigator.mediaDevices.getUserMedia({video:true}).then(s=>{
+        stream = s; video.srcObject = stream;
+      });
+      hideMsg();
+    };
+
+    // Send Email function (EmailJS version)
+    sendBtn.onclick = async function(ev){
+      ev.preventDefault();
+      const to = document.getElementById('toEmail').value.trim();
+      const name = document.getElementById('userName').value.trim();
+      const userEmail = document.getElementById('userEmail').value.trim();
+      const msgText = document.getElementById('message').value.trim();
+
+      if (!to || !name || !userEmail) { msg('Please fill all fields.','error'); return; }
+      if (!imageData) { msg('No captured image to send!','error'); return; }
+
+      sendBtn.disabled = true;
+      msg('Sending email...', 'info');
+
+      // Option 1: EmailJS client API (Base64 image as template param)
+      // Template should have {{to_email}}, {{from_name}}, {{from_email}}, {{message}}, {{image_base64}}
+      try {
+        if (!window.emailjs) throw new Error("EmailJS not loaded.");
+        const params = {
+          to_email: to,
+          from_name: name,
+          from_email: userEmail,
+          message: msgText,
+          image_base64: imageData // Must include in your EmailJS template
+        };
+        await emailjs.send(EMAILJS_SERVICE, EMAILJS_TEMPLATE, params);
+        msg('Email sent successfully!', 'success');
+        form.reset();
+        sendBtn.disabled = false;
+      } catch (err) {
+        msg('Email failed: '+err.message, 'error');
+        sendBtn.disabled = false;
+      }
+
+      // Option 2: Send via backend API (uncomment and use your endpoint)
+      /* 
+      try {
+        const resp = await fetch('https://your-backend/send-photo-email', {
+          method:'POST',
+          body: JSON.stringify({
+            to, name, userEmail, msgText, image: imageData
+          }),
+          headers: {'Content-Type':'application/json'}
+        });
+        if (!resp.ok) throw new Error('Backend error');
+        msg('Email sent via backend!', 'success');
+      } catch (err) {
+        msg('API error: '+err.message, 'error');
+      } finally { sendBtn.disabled = false; }
+      */
+    };
+  </script>
+</body>
+</html>
