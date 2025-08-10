@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Photo Capture App</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            padding: 30px;
+            max-width: 500px;
+            width: 90%;
+            text-align: center;
+        }
+
+        .header h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2.2em;
+        }
+
+        .header p {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+
+        .camera-section {
+            margin-bottom: 30px;
+        }
+
+        .video-container {
+            position: relative;
+            display: inline-block;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 20px;
+        }
+
+        #video {
+            width: 100%;
+            max-width: 400px;
+            height: 300px;
+            object-fit: cover;
+            display: block;
+        }
+
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
+        }
+
+        .focus-ring {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100px;
+            height: 100px;
+            border: 3px solid rgba(255,255,255,0.8);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+            50% { transform: translate(-50%, -50%) scale(1.1); opacity: 0.7; }
+            100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 25px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .btn-primary {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+        }
+
+        .btn-capture {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a52);
+            color: white;
+            font-size: 18px;
+            padding: 15px 30px;
+        }
+
+        .btn-secondary {
+            background: linear-gradient(45deg, #ffd93d, #ffcd02);
+            color: #333;
+        }
+
+        .btn-success {
+            background: linear-gradient(45deg, #00d4aa, #00b894);
+            color: white;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .photo-preview {
+            margin-top: 20px;
+        }
+
+        #photo {
+            max-width: 100%;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            animation: fadeIn 0.5s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.8); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .status {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            color: #333;
+            font-weight: 500;
+            margin-top: 20px;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 600px) {
+            .container {
+                padding: 20px;
+                margin: 10px;
+            }
+            
+            .controls {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .btn {
+                width: 100%;
+                max-width: 250px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-camera"></i> Photo Studio</h1>
+            <p>Capture amazing photos with style!</p>
+        </div>
+        
+        <div class="camera-section">
+            <div class="video-container">
+                <video id="video" autoplay playsinline></video>
+                <div class="overlay">
+                    <div class="focus-ring"></div>
+                </div>
+            </div>
+            
+            <div class="controls">
+                <button id="startCamera" class="btn btn-primary">
+                    <i class="fas fa-video"></i> Start Camera
+                </button>
+                <button id="capture" class="btn btn-capture" disabled>
+                    <i class="fas fa-camera"></i> Capture Photo
+                </button>
+                <button id="retake" class="btn btn-secondary" style="display:none;">
+                    <i class="fas fa-redo"></i> Retake
+                </button>
+                <button id="download" class="btn btn-success" style="display:none;">
+                    <i class="fas fa-download"></i> Download
+                </button>
+            </div>
+        </div>
+        
+        <div class="photo-section">
+            <canvas id="canvas" style="display:none;"></canvas>
+            <div id="photoPreview" class="photo-preview" style="display:none;">
+                <img id="photo" alt="Captured Photo" />
+            </div>
+        </div>
+        
+        <div class="status" id="status">
+            Click "Start Camera" to begin capturing photos!
+        </div>
+    </div>
+
+    <script>
+        class PhotoCapture {
+            constructor() {
+                this.video = document.getElementById('video');
+                this.canvas = document.getElementById('canvas');
+                this.photo = document.getElementById('photo');
+                this.photoPreview = document.getElementById('photoPreview');
+                this.startBtn = document.getElementById('startCamera');
+                this.captureBtn = document.getElementById('capture');
+                this.retakeBtn = document.getElementById('retake');
+                this.downloadBtn = document.getElementById('download');
+                this.status = document.getElementById('status');
+                
+                this.stream = null;
+                this.photoData = null;
+                
+                this.initEventListeners();
+            }
+            
+            initEventListeners() {
+                this.startBtn.addEventListener('click', () => this.startCamera());
+                this.captureBtn.addEventListener('click', () => this.capturePhoto());
+                this.retakeBtn.addEventListener('click', () => this.retakePhoto());
+                this.downloadBtn.addEventListener('click', () => this.downloadPhoto());
+            }
+            
+            async startCamera() {
+                try {
+                    this.updateStatus('Accessing camera...', 'info');
+                    
+                    this.stream = await navigator.mediaDevices.getUserMedia({ 
+                        video: { 
+                            width: { ideal: 640 },
+                            height: { ideal: 480 },
+                            facingMode: 'user'
+                        } 
+                    });
+                    
+                    this.video.srcObject = this.stream;
+                    this.video.onloadedmetadata = () => {
+                        this.canvas.width = this.video.videoWidth;
+                        this.canvas.height = this.video.videoHeight;
+                    };
+                    
+                    this.startBtn.style.display = 'none';
+                    this.captureBtn.disabled = false;
+                    this.updateStatus('Camera ready! Click capture to take a photo.', 'success');
+                    
+                } catch (err) {
+                    console.error('Error accessing camera:', err);
+                    this.updateStatus('Unable to access camera. Please check permissions.', 'error');
+                }
+            }
+            
+            capturePhoto() {
+                const context = this.canvas.getContext('2d');
+                
+                // Add capture animation
+                this.video.style.filter = 'brightness(1.5)';
+                setTimeout(() => {
+                    this.video.style.filter = 'none';
+                }, 150);
+                
+                // Draw video frame to canvas
+                context.drawImage(this.video, 0, 0, this.canvas.width, this.canvas.height);
+                
+                // Convert to image data
+                this.photoData = this.canvas.toDataURL('image/png');
+                this.photo.src = this.photoData;
+                this.photoPreview.style.display = 'block';
+                
+                // Update UI
+                this.captureBtn.style.display = 'none';
+                this.retakeBtn.style.display = 'inline-flex';
+                this.downloadBtn.style.display = 'inline-flex';
+                
+                this.updateStatus('Photo captured successfully! 📸', 'success');
+                
+                // Stop camera
+                this.stopCamera();
+            }
+            
+            retakePhoto() {
+                this.photoPreview.style.display = 'none';
+                this.retakeBtn.style.display = 'none';
+                this.downloadBtn.style.display = 'none';
+                this.startBtn.style.display = 'inline-flex';
+                this.captureBtn.disabled = true;
+                
+                this.updateStatus('Click "Start Camera" to take another photo!', 'info');
+            }
+            
+            downloadPhoto() {
+                if (this.photoData) {
+                    const link = document.createElement('a');
+                    link.download = `photo_${Date.now()}.png`;
+                    link.href = this.photoData;
+                    link.click();
+                    
+                    this.updateStatus('Photo downloaded! 📥', 'success');
+                }
+            }
+            
+            stopCamera() {
+                if (this.stream) {
+                    this.stream.getTracks().forEach(track => track.stop());
+                    this.video.srcObject = null;
+                }
+            }
+            
+            updateStatus(message, type = 'info') {
+                this.status.textContent = message;
+                this.status.className = `status ${type}`;
+            }
+        }
+
+        // Initialize the app when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            new PhotoCapture();
+        });
+
+        // Handle page unload
+        window.addEventListener('beforeunload', () => {
+            if (window.photoApp && window.photoApp.stream) {
+                window.photoApp.stopCamera();
+            }
+        });
+    </script>
+</body>
+</html>
