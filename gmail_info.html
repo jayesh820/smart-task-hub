@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Fetch Last Gmail Email Info</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://apis.google.com/js/api.js"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 40px;
+      background: #f4f4f9;
+      color: #333;
+    }
+    #content {
+      max-width: 600px;
+      margin: auto;
+      background: white;
+      padding: 20px 30px;
+      border-radius: 10px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+    }
+    button {
+      background-color: #4285F4;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      margin: 10px 5px 0 0;
+      font-size: 1rem;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    button:disabled {
+      background-color: #9abcf9;
+      cursor: not-allowed;
+    }
+    h2 { margin-top: 0; }
+    #emailInfo {
+      background: #e9f0ff;
+      border-radius: 8px;
+      padding: 20px;
+      margin-top: 20px;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+  </style>
+</head>
+<body>
+  <div id="content">
+    <h2>Fetch Latest Gmail Email Info</h2>
+    <p>Sign in to your Google account and read the latest email's details.</p>
+    <button id="authorize_button">Sign In</button>
+    <button id="signout_button" style="display:none;">Sign Out</button>
+    <div id="emailInfo"></div>
+  </div>
+
+  <script>
+    // ------------- EDIT HERE: Put your own credentials -------------
+    const CLIENT_ID = 'YOUR_CLIENT_ID.apps.googleusercontent.com'; // <-- Replace with your Google OAuth Client ID
+    const API_KEY = 'YOUR_API_KEY'; // <-- Replace with your Google API Key
+    // ------------- STOP EDITING -------------
+
+    const DISCOVERY_DOC = "https://www.googleapis.com/discovery/v1/apis/gmail/v1/rest";
+    const SCOPES = "https://www.googleapis.com/auth/gmail.readonly";
+
+    let tokenClient;
+    let gapiInited = false;
+    let gisInited = false;
+
+    const authorizeButton = document.getElementById('authorize_button');
+    const signoutButton = document.getElementById('signout_button');
+    const emailInfoDiv = document.getElementById('emailInfo');
+
+    function gapiLoaded() {
+      gapi.load('client', initializeGapiClient);
+    }
+
+    async function initializeGapiClient() {
+      await gapi.client.init({
+        apiKey: API_KEY,
+        discoveryDocs: [DISCOVERY_DOC],
+      });
+      gapiInited = true;
+      maybeEnableButtons();
+    }
+
+    function gisLoaded() {
+      tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: CLIENT_ID,
+        scope: SCOPES,
+        callback: '', // will be set on Sign In
+      });
+      gisInited = true;
+      maybeEnableButtons();
+    }
+
+    function maybeEnableButtons() {
+      if (gapiInited && gisInited) {
+        authorizeButton.style.display = "inline-block";
+        authorizeButton.disabled = false;
+      }
+    }
+
+    authorizeButton.onclick = () => {
+      tokenClient.callback = async (resp) => {
+        if (resp.error !== undefined) {
+          emailInfoDiv.textContent = "Authorization error: " + resp.error;
+          return;
+        }
+        authorizeButton.style.display = "none";
+        signoutButton.style.display = "inline-block";
+        await listLatestEmail();
+      };
+      if (gapi.client.getToken() === null) {
+        tokenClient.requestAccessToken({prompt: "consent"});
+      } else {
+        tokenClient.requestAccessToken({prompt: ""});
+      }
+    };
+
+    signoutButton.onclick = () => {
+      const token = gapi.client.getToken();
+      if (token) {
+        google.accounts.oauth2.revoke(token.access_token);
+        gapi.client.setToken("");
+        emailInfoDiv.textContent = "";
+        authorizeButton.style.display = "inline-block";
+        signoutButton.style.display = "none";
+      }
+    };
+
+    async function listLatestEmail() {
+      emailInfoDiv.textContent = "Fetching latest email...";
+      try {
+        const response = await gapi.client.gmail.users.messages.list({
+          userId: 'me',
+          maxResults: 1,
+          labelIds: ['INBOX'],
+          q: "",
+        });
+        if (!response.result.messages || response.result.messages.length === 0) {
+          emailInfoDiv.textContent = "No emails found in your inbox.";
+          return;
+        }
+        const messageId = response.result.messages[0].id;
+        const messageResponse = await gapi.client.gmail.users.messages.get({
+          userId: 'me',
+          id: messageId,
+          format: "full",
+        });
+
+        const headers = messageResponse.result.payload.headers;
+        const snippet = messageResponse.result.snippet || "";
+
+        let from = "Unknown";
+        let subject = "No Subject";
+
+        headers.forEach(header => {
+          if (header.name === "From") from = header.value;
+          else if (header.name === "Subject") subject = header.value;
+        });
+
+        emailInfoDiv.innerHTML = `
+          <strong>From:</strong> ${from}<br/>
+          <strong>Subject:</strong> ${subject}<br/>
+          <strong>Snippet:</strong> ${snippet}
+        `;
+      } catch (error) {
+        emailInfoDiv.textContent = "Error fetching email: " + error.message;
+      }
+    }
+
+    // --- Initialize libraries once DOM is ready ---
+    window.onload = () => {
+      gapiLoaded();
+      gisLoaded();
+    };
+  </script>
+</body>
+</html>
