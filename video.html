@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Video Mailer Pro</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Icons -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet" />
+  <!-- EmailJS SDK (load only if using EmailJS option) -->
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+  <style>
+    :root{
+      --bg1:#6a11cb; --bg2:#2575fc;
+      --card:#ffffff; --text:#222; --muted:#666;
+      --accent:#ff6b6b; --accent2:#00d4aa; --accent3:#ffd93d;
+      --success:#1b5e20; --error:#b71c1c; --info:#0c5460;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif;
+      min-height:100vh; display:flex; align-items:center; justify-content:center;
+      background:linear-gradient(135deg,var(--bg1),var(--bg2));
+      padding:24px;
+    }
+    .app{
+      width:100%; max-width:960px; background:var(--card); color:var(--text);
+      border-radius:20px; box-shadow:0 30px 80px rgba(0,0,0,.25);
+      overflow:hidden;
+    }
+    .header{
+      padding:22px 24px; display:flex; align-items:center; gap:14px;
+      border-bottom:1px solid #eee; background:linear-gradient(45deg,#fff,#f7f8ff);
+    }
+    .header h1{margin:0; font-size:1.4rem}
+    .grid{
+      display:grid; grid-template-columns:1.2fr .8fr; gap:18px; padding:18px;
+    }
+    @media (max-width:900px){ .grid{grid-template-columns:1fr} }
+    .card{
+      background:#fff; border:1px solid #eee; border-radius:16px; overflow:hidden;
+    }
+    .card .title{
+      padding:14px 16px; font-weight:700; border-bottom:1px solid #f0f0f0;
+      display:flex; align-items:center; gap:10px;
+    }
+    .content{padding:14px 16px}
+    .video-wrap{
+      position:relative; border-radius:14px; overflow:hidden; background:#000;
+      aspect-ratio:16/9; display:flex; align-items:center; justify-content:center;
+    }
+    video{width:100%; height:100%; object-fit:cover; background:#000}
+    .overlay-ui{
+      position:absolute; inset:0; pointer-events:none;
+      background:radial-gradient(transparent, rgba(0,0,0,.25) 70%);
+    }
+    .focus-ring{
+      position:absolute; width:120px; height:120px; border:3px solid rgba(255,255,255,.7);
+      border-radius:50%; top:50%; left:50%; transform:translate(-50%,-50%);
+      animation:pulse 2.5s infinite;
+    }
+    @keyframes pulse{
+      0%{transform:translate(-50%,-50%) scale(1); opacity:1}
+      50%{transform:translate(-50%,-50%) scale(1.08); opacity:.6}
+      100%{transform:translate(-50%,-50%) scale(1); opacity:1}
+    }
+    .controls{
+      display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;
+    }
+    .btn{
+      border:none; border-radius:24px; padding:12px 16px; font-weight:700;
+      display:inline-flex; align-items:center; gap:8px; cursor:pointer;
+      transition:transform .15s ease, box-shadow .15s ease, opacity .2s;
+      box-shadow:0 6px 18px rgba(0,0,0,.15);
+      background:#f4f5f7; color:#222;
+    }
+    .btn:hover{transform:translateY(-1px)}
+    .btn:disabled{opacity:.55; cursor:not-allowed; transform:none; box-shadow:none}
+    .primary{background:linear-gradient(45deg,#4caf50,#2e7d32); color:white}
+    .accent{background:linear-gradient(45deg,var(--accent),#ee5a52); color:white}
+    .gold{background:linear-gradient(45deg,var(--accent3),#ffb703); color:#221}
+    .teal{background:linear-gradient(45deg,var(--accent2),#00b894); color:white}
+    .neutral{background:#eceff4}
+    .badge{
+      display:inline-flex; align-items:center; gap:6px; padding:6px 10px;
+      border-radius:999px; font-size:.83rem; font-weight:700;
+    }
+    .success{background:#d4edda; color:var(--success)}
+    .error{background:#fdecea; color:var(--error)}
+    .info{background:#e8f4fd; color:var(--info)}
+    .row{display:flex; gap:10px}
+    .row > *{flex:1}
+    label{font-size:.9rem; font-weight:700; color:#333}
+    input, textarea, select{
+      width:100%; padding:12px 12px; border:2px solid #e6e8ef; border-radius:10px;
+      outline:none; transition:border-color .15s ease, box-shadow .15s ease;
+      background:#fff; font-size:.95rem;
+    }
+    input:focus, textarea:focus, select:focus{
+      border-color:#6a11cb; box-shadow:0 0 0 3px rgba(106,17,203,.12)
+    }
+    .meter{
+      height:8px; width:100%; background:#f0f2f7; border-radius:999px; overflow:hidden;
+    }
+    .meter > div{height:100%; background:linear-gradient(90deg,#22c55e,#84cc16); width:0%}
+    .thumb{
+      margin-top:10px; background:#0b0b0b; border-radius:12px; padding:10px;
+      display:flex; align-items:center; gap:10px; color:#fff; font-size:.9rem;
+    }
+    .thumb video{width:140px; height:80px; object-fit:cover; border-radius:8px}
+    .status{
+      padding:12px; border-radius:12px; margin-top:10px; font-weight:700; display:none;
+    }
+    .hint{color:var(--muted); font-size:.86rem}
+    .pill{
+      display:inline-flex; gap:8px; align-items:center; padding:8px 12px; border-radius:999px;
+      background:#f6f7fb; font-weight:700; color:#333; font-size:.88rem
+    }
+    .toggle{
+      display:inline-flex; background:#f0f2f7; border-radius:999px; padding:5px;
+    }
+    .toggle button{
+      border:none; background:transparent; padding:8px 12px; border-radius:999px;
+      cursor:pointer; font-weight:800; color:#333;
+    }
+    .toggle .active{background:#fff; box-shadow:0 2px 10px rgba(0,0,0,.12); color:#6a11cb}
+    .list{display:flex; gap:8px; flex-wrap:wrap; margin-top:6px}
+    .chip{padding:6px 10px; border-radius:999px; background:#f2f4f8; font-size:.78rem; font-weight:700; color:#444}
+    .footer{
+      padding:14px 16px; border-top:1px solid #f0f0f0; display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px;
+      background:linear-gradient(90deg,#fff,#f7fbff);
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="header">
+      <span class="pill"><i class="fa-solid fa-video"></i> Video Mailer Pro</span>
+      <h1>Record. Upload. Email. Done.</h1>
+    </div>
+
+    <div class="grid">
+      <!-- Left: Camera & Recording -->
+      <div class="card">
+        <div class="title"><i class="fa-solid fa-camera"></i> Camera & Recording</div>
+        <div class="content">
+          <div class="video-wrap" id="liveBox">
+            <video id="live" playsinline autoplay muted></video>
+            <div class="overlay-ui"></div>
+            <div class="focus-ring"></div>
+          </div>
+
+          <div class="controls">
+            <button id="btnStartCam" class="btn primary"><i class="fa-solid fa-video"></i> Start Camera</button>
+            <button id="btnFlip" class="btn neutral" title="Flip camera"><i class="fa-solid fa-arrows-rotate"></i> Flip</button>
+            <button id="btnStartRec" class="btn accent" disabled><i class="fa-solid fa-circle-dot"></i> Start Recording</button>
+            <button id="btnStopRec" class="btn gold" disabled><i class="fa-solid fa-stop"></i> Stop</button>
+            <button id="btnMute" class="btn neutral" disabled><i class="fa-solid fa-microphone-slash"></i> Mute</button>
+            <button id="btnTorch" class="btn neutral" disabled><i class="fa-solid fa-bolt"></i> Torch</button>
+            <button id="btnDownload" class="btn teal" disabled><i class="fa-solid fa-download"></i> Download</button>
+            <span id="recBadge" class="badge info" style="display:none"><i class="fa-solid fa-timer"></i><span id="timer">00:00</span> • <span id="sizeHint">0MB</span></span>
+          </div>
+
+          <div class="list">
+            <span class="chip">HD/FullHD selectable</span>
+            <span class="chip">Auto-stop by size/duration</span>
+            <span class="chip">Preview before send</span>
+            <span class="chip">Safe on mobile</span>
+          </div>
+
+          <div id="preview" class="thumb" style="display:none">
+            <video id="playback" controls></video>
+            <div style="flex:1">
+              <div><strong id="fileName">record.webm</strong> <span class="hint" id="fileMeta">—</span></div>
+              <div class="meter" aria-label="Upload progress"><div id="meterFill"></div></div>
+              <div class="hint">Tip: Long videos are sent via link for reliability.</div>
+            </div>
+          </div>
+
+          <div id="camStatus" class="status info"></div>
+        </div>
+      </div>
+
+      <!-- Right: Email & Upload Options -->
+      <div class="card">
+        <div class="title"><i class="fa-solid fa-envelope"></i> Email & Delivery</div>
+        <div class="content">
+          <div class="row">
+            <div>
+              <label>Recipient Email</label>
+              <input id="toEmail" type="email" placeholder="recipient@example.com" required />
+            </div>
+          </div>
+          <div class="row">
+            <div>
+              <label>Subject</label>
+              <input id="subject" type="text" placeholder="Video message" />
+            </div>
+          </div>
+          <div>
+            <label>Message</label>
+            <textarea id="message" rows="4" placeholder="Write a short note..."></textarea>
+          </div>
+
+          <div style="margin-top:10px">
+            <label>Quality & Limits</label>
+            <div class="row">
+              <div>
+                <select id="quality">
+                  <option value="1280x720,4000">HD 720p (4Mbps)</option>
+                  <option value="1920x1080,6000">FullHD 1080p (6Mbps)</option>
+                  <option value="640x360,1500">SD 360p (1.5Mbps)</option>
+                </select>
+              </div>
+              <div>
+                <input id="maxSeconds" type="number" min="5" max="600" value="60" />
+                <div class="hint">Max duration (sec)</div>
+              </div>
+              <div>
+                <input id="maxMB" type="number" min="5" max="500" value="50" />
+                <div class="hint">Max size (MB)</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top:10px">
+            <label>Send Method</label>
+            <div class="toggle" role="tablist">
+              <button id="tabEmailJS" class="active" role="tab" aria-selected="true">EmailJS</button>
+              <button id="tabAPI" role="tab" aria-selected="false">Backend API</button>
+            </div>
+            <div class="hint" id="methodHint">Best for quick demos and small clips (sends as attachment or base64).</div>
+          </div>
+
+          <div style="margin-top:12px">
+            <div class="row">
+              <div>
+                <label>Your Name</label>
+                <input id="fromName" type="text" placeholder="Your Name" />
+              </div>
+              <div>
+                <label>Your Email</label>
+                <input id="fromEmail" type="email" placeholder="you@example.com" />
+              </div>
+            </div>
+          </div>
+
+          <!-- EmailJS config (client-side) -->
+          <div id="emailjsBox" style="margin-top:12px">
+            <div class="row">
+              <div>
+                <label>EmailJS Public Key</label>
+                <input id="emailjsPublic" type="text" placeholder="PUBLIC_KEY" />
+              </div>
+            </div>
+            <div class="row">
+              <div>
+                <label>Service ID</label>
+                <input id="emailjsService" type="text" placeholder="service_xxx" />
+              </div>
+              <div>
+                <label>Template ID</label>
+                <input id="emailjsTemplate" type="text" placeholder="template_xxx" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Backend API config -->
+          <div id="apiBox" style="display:none; margin-top:12px">
+            <div class="row">
+              <div>
+                <label>Upload Endpoint</label>
+                <input id="uploadUrl" type="url" placeholder="https://your-api.com/upload" />
+              </div>
+            </div>
+            <div class="row">
+              <div>
+                <label>Email Endpoint</label>
+                <input id="emailUrl" type="url" placeholder="https://your-api.com/send-email" />
+              </div>
+              <div>
+                <label>API Key (optional)</label>
+                <input id="apiKey" type="text" placeholder="Bearer token or API key" />
+              </div>
+            </div>
+          </div>
+
+          <div class="controls" style="margin-top:12px">
+            <button id="btnSend" class="btn primary" disabled><i class="fa-solid fa-paper-plane"></i> Send Video</button>
+            <button id="btnReset" class="btn neutral"><i class="fa-solid fa-broom"></i> Reset</button>
+          </div>
+
+          <div id="sendStatus" class="status"></div>
+
+          <div style="margin-top:8px">
+            <div class="list">
+              <span class="chip">Auto email after upload</span>
+              <span class="chip">Progress meter</span>
+              <span class="chip">Mobile torch</span>
+              <span class="chip">Camera switch</span>
+              <span class="chip">Mute/unmute mic</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <span class="hint">Tip: For large files, use Backend API to upload to storage (S3/Drive) and email a link for reliable delivery.</span>
+      <div class="pill"><i class="fa-solid fa-shield"></i> Permissions: HTTPS required for camera and mic.</div>
+    </div>
+  </div>
+
+  <script>
+    // State
+    let stream = null;
+    let mediaRecorder = null;
+    let chunks = [];
+    let recording = false;
+    let facing = 'user'; // or 'environment'
+    let torchOn = false;
+    let audioMuted = false;
+    let timerId = null;
+    let seconds = 0;
+    let byteCount = 0;
+    let method = 'emailjs'; // or 'api'
+    let lastBlob = null;
+    let lastFileName = '';
+    let lastMime = 'video/webm';
+    let trackWithTorch = null;
+
+    // Elements
+    const live = document.getElementById('live');
+    const playback = document.getElementById('playback');
+    const btnStartCam = document.getElementById('btnStartCam');
+    const btnFlip = document.getElementById('btnFlip');
+    const btnStartRec = document.getElementById('btnStartRec');
+    const btnStopRec = document.getElementById('btnStopRec');
+    const btnMute = document.getElementById('btnMute');
+    const btnTorch = document.getElementById('btnTorch');
+    const btnDownload = document.getElementById('btnDownload');
+    const btnSend = document.getElementById('btnSend');
+    const btnReset = document.getElementById('btnReset');
+    const recBadge = document.getElementById('recBadge');
+    const timer = document.getElementById('timer');
+    const sizeHint = document.getElementById('sizeHint');
+    const camStatus = document.getElementById('camStatus');
+
+    const toEmail = document.getElementById('toEmail');
+    const subject = document.getElementById('subject');
+    const message = document.getElementById('message');
+    const quality = document.getElementById('quality');
+    const maxSeconds = document.getElementById('maxSeconds');
+    const maxMB = document.getElementById('maxMB');
+    const meterFill = document.getElementById('meterFill');
+    const preview = document.getElementById('preview');
+    const fileNameEl = document.getElementById('fileName');
+    const fileMeta = document.getElementById('fileMeta');
+    const sendStatus = document.getElementById('sendStatus');
+
+    const tabEmailJS = document.getElementById('tabEmailJS');
+    const tabAPI = document.getElementById('tabAPI');
+    const emailjsBox = document.getElementById('emailjsBox');
+    const apiBox = document.getElementById('apiBox');
+    const methodHint = document.getElementById('methodHint');
+
+    const emailjsPublic = document.getElementById('emailjsPublic');
+    const emailjsService = document.getElementById('emailjsService');
+    const emailjsTemplate = document.getElementById('emailjsTemplate');
+
+    const uploadUrl = document.getElementById('uploadUrl');
+    const emailUrl = document.getElementById('emailUrl');
+    const apiKey = document.getElementById('apiKey');
+    const fromName = document.getElementById('fromName');
+    const fromEmail = document.getElementById('fromEmail');
+
+    // Helpers
+    function fmtTime(s){ const m = Math.floor(s/60).toString().padStart(2,'0'); const ss = (s%60).toString().padStart(2,'0'); return m+':'+ss; }
+    function fmtMB(bytes){ return (bytes/1024/1024).toFixed(1)+'MB'; }
+    function showStatus(el, text, type='info'){ el.textContent = text; el.className = 'status '+type; el.style.display='block'; }
+    function hideStatus(el){ el.style.display='none'; }
+    function setProgress(p){ meterFill.style.width = Math.max(0, Math.min(100, p)) + '%'; }
+
+    function canTorch(track){
+      if (!track) return false;
+      const caps = track.getCapabilities?.();
+      return !!(caps && 'torch' in caps);
+    }
+
+    async function setTorch(on){
+      if (!trackWithTorch) return;
+      try{
+        await trackWithTorch.applyConstraints({ advanced:[{ torch:on }] });
+        torchOn = on;
+        btnTorch.classList.toggle('teal', on);
+      }catch(e){
+        console.warn('Torch failed:', e);
+        showStatus(camStatus, 'Torch not supported on this device.', 'error');
+      }
+    }
+
+    function pickMime(){
+      const options = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4'];
+      for (const t of options){
+        if (MediaRecorder.isTypeSupported(t)) return t;
+      }
+      return 'video/webm';
+    }
+
+    async function startCamera(){
+      try{
+        showStatus(camStatus, 'Requesting camera...', 'info');
+        const [wh, kbps] = quality.value.split(',');
+        const [w,h] = wh.split('x').map(Number);
+        const vConstraints = {
+          width:{ ideal:w }, height:{ ideal:h },
+          facingMode: facing,
+          frameRate:{ ideal:30, max:30 }
+        };
+        const aConstraints = { echoCancellation:true, noiseSuppression:true, autoGainControl:true };
+
+        stream = await navigator.mediaDevices.getUserMedia({ video:vConstraints, audio:aConstraints });
+        live.srcObject = stream;
+
+        // Prepare torch capability
+        trackWithTorch = stream.getVideoTracks()[0] || null;
+        btnTorch.disabled = !canTorch(trackWithTorch);
+
+        btnStartRec.disabled = false;
+        btnMute.disabled = false;
+        btnFlip.disabled = true; // flipping needs track restart; we allow it when not recording
+        showStatus(camStatus, 'Camera ready. Adjust quality if needed and click Start Recording.', 'success');
+      }catch(e){
+        showStatus(camStatus, 'Camera/mic permission denied or unavailable.', 'error');
+        console.error(e);
+      }
+    }
+
+    async function restartCameraWithFacing(newFacing){
+      facing = newFacing;
+      if (stream){
+        stream.getTracks().forEach(t=>t.stop());
+        stream = null;
+      }
+      await startCamera();
+    }
+
+    function startRecording(){
+      if (!stream) return;
+      chunks = [];
+      byteCount = 0;
+      seconds = 0;
+      const mime = pickMime();
+      lastMime = mime;
+
+      mediaRecorder = new MediaRecorder(stream, { mimeType:mime, videoBitsPerSecond: Number(quality.value.split(',')[1])*1000 });
+      mediaRecorder.ondataavailable = (e)=>{
+        if (e.data && e.data.size>0){
+          chunks.push(e.data);
+          byteCount += e.data.size;
+          sizeHint.textContent = fmtMB(byteCount);
+          // Auto-stop by size
+          const maxBytes = Number(maxMB.value)*1024*1024;
+          if (byteCount >= maxBytes){
+            stopRecording(true);
+          }
+        }
+      };
+      mediaRecorder.onstop = ()=>{
+        lastBlob = new Blob(chunks, {type:lastMime});
+        const url = URL.createObjectURL(lastBlob);
+        playback.src = url;
+        preview.style.display = 'flex';
+        btnDownload.disabled = false;
+        btnSend.disabled = false;
+
+        const ts = new Date().toISOString().replace(/[:.]/g,'-');
+        const ext = lastMime.includes('mp4') ? 'mp4' : 'webm';
+        lastFileName = `record-${ts}.${ext}`;
+        fileNameEl.textContent = lastFileName;
+        fileMeta.textContent = ` ${fmtMB(lastBlob.size)} • ${lastMime}`;
+      };
+
+      mediaRecorder.start(800); // gather chunks ~every 0.8s
+      recording = true;
+      btnStartRec.disabled = true;
+      btnStopRec.disabled = false;
+      btnFlip.disabled = true;
+      btnMute.disabled = false;
+      btnTorch.disabled = !canTorch(trackWithTorch);
+      recBadge.style.display = 'inline-flex';
+      timer.textContent = '00:00';
+      sizeHint.textContent = '0MB';
+
+      // Timer & auto-stop by time
+      timerId = setInterval(()=>{
+        seconds++;
+        timer.textContent = fmtTime(seconds);
+        const maxS = Number(maxSeconds.value)||0;
+        if (maxS>0 && seconds>=maxS){
+          stopRecording(true);
+        }
+      }, 1000);
+    }
+
+    function stopRecording(auto=false){
+      if (!recording) return;
+      recording = false;
+      try{ mediaRecorder.stop(); }catch(_){}
+      clearInterval(timerId);
+      timerId = null;
+      recBadge.style.display = 'none';
+      btnStartRec.disabled = false;
+      btnStopRec.disabled = true;
+      btnFlip.disabled = false;
+      showStatus(camStatus, auto ? 'Recording auto-stopped by limit.' : 'Recording stopped.', 'info');
+    }
+
+    function toggleMute(){
+      if (!stream) return;
+      stream.getAudioTracks().forEach(t=> t.enabled = !t.enabled);
+      audioMuted = !audioMuted;
+      btnMute.classList.toggle('teal', audioMuted);
+      btnMute.innerHTML = audioMuted ? '<i class="fa-solid fa-microphone-slash"></i> Unmute' : '<i class="fa-solid fa-microphone"></i> Mute';
+    }
+
+    function download(){
+      if (!lastBlob) return;
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(lastBlob);
+      a.download = lastFileName || 'record.webm';
+      a.click();
+    }
+
+    function resetAll(){
+      // Stop media
+      if (stream){ stream.getTracks().forEach(t=>t.stop()); stream = null; }
+      // Reset UI
+      live.srcObject = null;
+      playback.removeAttribute('src'); playback.load();
+      preview.style.display = 'none';
+      btnDownload.disabled = true;
+      btnSend.disabled = true;
+      btnStartRec.disabled = true;
+      btnStopRec.disabled = true;
+      btnMute.disabled = true;
+      btnTorch.disabled = true;
+      btnFlip.disabled = false;
+      setProgress(0);
+      hideStatus(sendStatus);
+      hideStatus(camStatus);
+      // Clear state
+      lastBlob = null;
+      chunks = [];
+      recording = false;
+      torchOn = false;
+      audioMuted = false;
+    }
+
+    // Method switching
+    function setMethod(newMethod){
+      method = newMethod;
+      tabEmailJS.classList.toggle('active', method==='emailjs');
+      tabAPI.classList.toggle('active', method==='api');
+      emailjsBox.style.display = method==='emailjs' ? 'block' : 'none';
+      apiBox.style.display = method==='api' ? 'block' : 'none';
+      methodHint.textContent = method==='emailjs'
+        ? 'Best for quick demos and small clips (sends as attachment or base64).'
+        : 'Recommended for larger files: upload to storage and email a share link.';
+    }
+
+    // Sending flows
+    async function sendViaEmailJS(){
+      if (!emailjsPublic.value || !emailjsService.value || !emailjsTemplate.value){
+        throw new Error('EmailJS credentials missing.');
+      }
+      if (!window.emailjs) throw new Error('EmailJS SDK not loaded.');
+      // Init (idempotent)
+      try{ emailjs.init({ publicKey: emailjsPublic.value }); }catch(_){}
+      // Convert to base64 (beware large size)
+      const base64 = await blobToBase64(lastBlob);
+      // Many providers reject big emails; we include size note
+      const params = {
+        to_email: toEmail.value,
+        from_name: fromName.value || 'Video Mailer',
+        from_email: fromEmail.value || 'no-reply@example.com',
+        subject: subject.value || 'Video message',
+        message: message.value || 'Please see attached video.',
+        video_name: lastFileName,
+        video_base64: base64, // Requires EmailJS template fields to accept large data; better to upload & link
+        size_hint: fmtMB(lastBlob.size)
+      };
+      const res = await emailjs.send(emailjsService.value, emailjsTemplate.value, params);
+      if (res.status !== 200) throw new Error('EmailJS send failed: '+res.text);
+    }
+
+    async function sendViaAPI(){
+      if (!uploadUrl.value || !emailUrl.value){
+        throw new Error('API endpoints missing.');
+      }
+      // 1) Upload video
+      showStatus(sendStatus, 'Uploading video...', 'info');
+      setProgress(5);
+
+      // Use multipart/form-data
+      const form = new FormData();
+      form.append('file', lastBlob, lastFileName);
+
+      const uploadRes = await fetch(uploadUrl.value, {
+        method:'POST',
+        headers: apiKey.value ? { 'Authorization': apiKey.value } : undefined,
+        body: form
+      });
+      if (!uploadRes.ok){
+        throw new Error('Upload failed: '+uploadRes.status+' '+uploadRes.statusText);
+      }
+      const uploadData = await uploadRes.json().catch(()=> ({}));
+      // Expect a URL field from backend (e.g., {url: "https://.../record.webm"})
+      const fileUrl = uploadData.url || uploadData.fileUrl || uploadData.location;
+      if (!fileUrl) throw new Error('Upload success but missing file URL in response.');
+
+      setProgress(60);
+      showStatus(sendStatus, 'Upload complete. Sending email...', 'info');
+
+      // 2) Send email with link
+      const emailPayload = {
+        to: toEmail.value,
+        from: { name: fromName.value || 'Video Mailer', email: fromEmail.value || 'no-reply@example.com' },
+        subject: subject.value || 'Video message',
+        html: `
+          <p>${(message.value || 'Please see the video link below.').replace(/\n/g,'<br>')}</p>
+          <p><strong>Video:</strong> <a href="${fileUrl}" target="_blank">${lastFileName}</a></p>
+          <p>Size: ${fmtMB(lastBlob.size)}</p>
+        `,
+        text: (message.value || 'Please see the video link below.') + '\\n' + (fileUrl || '')
+      };
+
+      const emailRes = await fetch(emailUrl.value, {
+        method:'POST',
+        headers:{
+          'Content-Type':'application/json',
+          ...(apiKey.value ? { 'Authorization': apiKey.value } : {})
+        },
+        body: JSON.stringify(emailPayload)
+      });
+      if (!emailRes.ok){
+        throw new Error('Email send failed: '+emailRes.status+' '+emailRes.statusText);
+      }
+      setProgress(100);
+    }
+
+    function blobToBase64(blob){
+      return new Promise((resolve, reject)=>{
+        const reader = new FileReader();
+        reader.onloadend = ()=> resolve(reader.result); // data:*/*;base64,...
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    }
+
+    // Events
+    btnStartCam.addEventListener('click', startCamera);
+    btnFlip.addEventListener('click', async ()=>{
+      if (recording) return;
+      await restartCameraWithFacing(facing==='user' ? 'environment' : 'user');
+    });
+    btnStartRec.addEventListener('click', startRecording);
+    btnStopRec.addEventListener('click', ()=> stopRecording(false));
+    btnMute.addEventListener('click', toggleMute);
+    btnTorch.addEventListener('click', ()=> setTorch(!torchOn));
+    btnDownload.addEventListener('click', download);
+    btnReset.addEventListener('click', resetAll);
+
+    tabEmailJS.addEventListener('click', ()=> setMethod('emailjs'));
+    tabAPI.addEventListener('click', ()=> setMethod('api'));
+
+    // Enable send only when we have a blob and a recipient
+    function refreshSendState(){
+      btnSend.disabled = !(lastBlob && toEmail.value);
+    }
+    toEmail.addEventListener('input', refreshSendState);
+
+    btnSend.addEventListener('click', async ()=>{
+      if (!lastBlob){ showStatus(sendStatus, 'Please record a video first.', 'error'); return; }
+      if (!toEmail.value){ showStatus(sendStatus, 'Recipient email required.', 'error'); return; }
+
+      showStatus(sendStatus, 'Preparing to send...', 'info');
+      btnSend.disabled = true;
+      try{
+        if (method==='emailjs'){
+          await sendViaEmailJS();
+        }else{
+          await sendViaAPI();
+        }
+        showStatus(sendStatus, 'Email sent successfully!', 'success');
+      }catch(e){
+        console.error(e);
+        showStatus(sendStatus, e.message || 'Sending failed.', 'error');
+      }finally{
+        btnSend.disabled = false;
+        setTimeout(()=> hideStatus(sendStatus), 6000);
+      }
+    });
+
+    // Security: stop tracks on unload
+    window.addEventListener('beforeunload', ()=>{
+      if (stream) stream.getTracks().forEach(t=>t.stop());
+    });
+
+    // Initial UI
+    setMethod('emailjs');
+  </script>
+</body>
+</html>
